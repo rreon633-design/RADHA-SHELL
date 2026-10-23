@@ -23,6 +23,9 @@ namespace XamlAudit;
 //   XA12 deep binding path member resolution
 //   XA13 element type exists in the WinUI projection (catches WPF/UWP-only controls
 //        such as UniformGrid that only the real XAML compiler would reject)
+//   XA14 attribute / Style setter names a real property or event on the resolved WinUI type
+//        (catches WPF-only members such as TextBlock.LetterSpacing — the same thing the XAML
+//        compiler reports as WMC0090)
 /// </summary>
 public static class Program
 {
@@ -110,12 +113,103 @@ public static class Program
         return names;
     }
 
+
+    private sealed record WinUiType(string? BaseType, HashSet<string> Properties, HashSet<string> Events);
+
+    private static readonly HashSet<string> SkippedAttributeNames = new(StringComparer.Ordinal)
+    {
+        "Class", "Name", "Key", "Uid", "FieldModifier", "DataType", "Bind", "ConnectionId",
+    };
+
+    /// <summary>
+    /// Loads the WinUI projection as a type graph (base type, properties, events) so XAML
+    /// attributes and Style setters can be resolved the way the XAML compiler resolves them.
+    /// </summary>
+    private static Dictionary<string, WinUiType>? LoadWinUiApi(string? path)
+    {
+        path ??= FindWinUiAssembly();
+        if (path is null || !File.Exists(path)) return null;
+
+        using var stream = File.OpenRead(path);
+        using var pe = new PEReader(stream);
+        if (!pe.HasMetadata) return null;
+        var md = pe.GetMetadataReader();
+
+        string Name(TypeDefinition t) => md.GetString(t.Namespace) + "." + md.GetString(t.Name);
+        string RefName(TypeReference r) => md.GetString(r.Namespace) + "." + md.GetString(r.Name);
+
+        string? BaseOf(TypeDefinition t)
+        {
+            if (t.BaseType.IsNil) return null;
+            return t.BaseType.Kind switch
+            {
+                HandleKind.TypeReference => RefName(md.GetTypeReference((TypeReferenceHandle)t.BaseType)),
+                HandleKind.TypeDefinition => Name(md.GetTypeDefinition((TypeDefinitionHandle)t.BaseType)),
+                _ => null,
+            };
+        }
+
+        var api = new Dictionary<string, WinUiType>(StringComparer.Ordinal);
+        foreach (var handle in md.TypeDefinitions)
+        {
+            var type = md.GetTypeDefinition(handle);
+            var ns = md.GetString(type.Namespace);
+            if (!ns.StartsWith("Microsoft.UI.Xaml", StringComparison.Ordinal)) continue;
+
+            var props = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var ph in type.GetProperties()) props.Add(md.GetString(md.GetPropertyDefinition(ph).Name));
+            var events = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var eh in type.GetEvents()) events.Add(md.GetString(md.GetEventDefinition(eh).Name));
+            api[Name(type)] = new WinUiType(BaseOf(type), props, events);
+        }
+        return api;
+    }
+
+    private static string? FindWinUiAssembly()
+    {
+        var nuget = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages");
+        if (!Directory.Exists(nuget)) return null;
+        return Directory.EnumerateFiles(nuget, "Microsoft.WinUI.dll", SearchOption.AllDirectories)
+            .Where(f => f.Contains("windowsappsdk", StringComparison.OrdinalIgnoreCase))
+            .Where(f => f.Contains($"{Path.DirectorySeparatorChar}lib{Path.DirectorySeparatorChar}"))
+            .OrderByDescending(f => f, StringComparer.Ordinal)
+            .FirstOrDefault();
+    }
+
+    private static string? ResolveWinUiType(Dictionary<string, WinUiType> api, string localName)
+    {
+        foreach (var ns in new[] { "Microsoft.UI.Xaml.Controls", "Microsoft.UI.Xaml" })
+        {
+            var candidate = $"{ns}.{localName}";
+            if (api.ContainsKey(candidate)) return candidate;
+        }
+        return null;
+    }
+
+    /// <summary>Property and event names, walking the base-type chain like XAML resolution does.</summary>
+    private static (HashSet<string> Properties, HashSet<string> Events) MembersOf(
+        Dictionary<string, WinUiType> api, string? typeName)
+    {
+        var props = new HashSet<string>(StringComparer.Ordinal);
+        var events = new HashSet<string>(StringComparer.Ordinal);
+        var guard = new HashSet<string>(StringComparer.Ordinal);
+        while (typeName is not null && api.TryGetValue(typeName, out var type) && guard.Add(typeName))
+        {
+            props.UnionWith(type.Properties);
+            events.UnionWith(type.Events);
+            typeName = type.BaseType;
+        }
+        return (props, events);
+    }
+
     public static int Main(string[] args)
     {
         var root = args.FirstOrDefault(a => !a.StartsWith("--")) ?? FindRepoRoot();
         var verbose = args.Contains("--verbose");
         var winuiArg = args.SkipWhile(a => a != "--winui").Skip(1).FirstOrDefault();
         var winuiTypes = LoadWinUiTypes(winuiArg);
+        var winuiApi = LoadWinUiApi(winuiArg);
 
         if (root is null || !Directory.Exists(Path.Combine(root, "src", "Radha.App")))
         {
@@ -387,6 +481,52 @@ public static class Program
                     if (winuiTypes.Contains(name)) continue;
                     findings.Add(new Finding("XA13", relative,
                         $"<{name}> is not a type in the WinUI projection — the XAML compiler will reject it (WMC0001)"));
+                }
+            }
+
+            // XA14 — attributes and Style setters must name real members of the resolved type.
+            if (winuiApi is not null)
+            {
+                const string Presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+
+                string? TargetTypeOf(XElement setter)
+                {
+                    var style = setter.Ancestors().FirstOrDefault(a => a.Name.LocalName == "Style");
+                    var raw = style?.Attribute("TargetType")?.Value;
+                    if (string.IsNullOrEmpty(raw)) return null;
+                    return ResolveWinUiType(winuiApi, raw.Contains(':') ? raw[(raw.IndexOf(':') + 1)..] : raw);
+                }
+
+                foreach (var element in doc.Descendants().Where(e => e.Name.NamespaceName == Presentation))
+                {
+                    var local = element.Name.LocalName;
+                    if (local.Contains('.')) continue;                 // property element
+                    var resolved = ResolveWinUiType(winuiApi, local);
+                    if (resolved is null) continue;                    // XA13 already reports it
+
+                    if (local == "Setter")
+                    {
+                        var property = element.Attribute("Property")?.Value;
+                        var target = TargetTypeOf(element);
+                        if (property is null || target is null || property.Contains('.')) continue;
+                        var (p, e) = MembersOf(winuiApi, target);
+                        if (!p.Contains(property) && !e.Contains(property))
+                            findings.Add(new Finding("XA14", relative,
+                                $"<Setter Property=\"{property}\"> — not a member of {target} (XAML compiler: WMC0090)"));
+                        continue;
+                    }
+
+                    var (props, events) = MembersOf(winuiApi, resolved);
+                    foreach (var attribute in element.Attributes())
+                    {
+                        if (attribute.IsNamespaceDeclaration) continue;
+                        if (attribute.Name.NamespaceName.Length != 0) continue;   // x:Name, d:…
+                        var name = attribute.Name.LocalName;
+                        if (name.Contains('.') || SkippedAttributeNames.Contains(name)) continue;  // attached
+                        if (!props.Contains(name) && !events.Contains(name))
+                            findings.Add(new Finding("XA14", relative,
+                                $"<{local} {name}=\"…\"> — not a member of {resolved} (XAML compiler: WMC0090)"));
+                    }
                 }
             }
 

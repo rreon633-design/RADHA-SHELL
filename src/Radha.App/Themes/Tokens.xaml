@@ -24,7 +24,7 @@
         <Setter Property="FontFamily" Value="{StaticResource RadhaFont}" />
         <Setter Property="FontSize" Value="26" />
         <Setter Property="FontWeight" Value="SemiLight" />
-        <Setter Property="LetterSpacing" Value="-20" />
+        <Setter Property="CharacterSpacing" Value="-20" />
     </Style>
 
     <Style x:Key="RadhaTitle" TargetType="TextBlock">
