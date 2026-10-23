@@ -500,7 +500,9 @@ public static class FeatureTests
 
         try
         {
-            var secret = "api_key=sk-live-abcdef1234567890";
+            // Deliberately contains "example": the repo secret scanner exempts obvious fixtures,
+            // and the redactor still has to strip it from the bundle.
+            var secret = "api_key=sk-example-not-a-real-key-000000";
             File.WriteAllText(Path.Combine(dir, "app.log"), "line one\n" + secret + "\n");
 
             var bundle = new DiagnosticsBundle()
@@ -525,7 +527,7 @@ public static class FeatureTests
 
             using var reader = new StreamReader(archive.GetEntry("logs/app.log")!.Open());
             var content = reader.ReadToEnd();
-            check("diag: secret redacted", !content.Contains("sk-live-abcdef1234567890", StringComparison.Ordinal));
+            check("diag: secret redacted", !content.Contains("sk-example-not-a-real-key-000000", StringComparison.Ordinal));
             check("diag: log content kept", content.Contains("line one", StringComparison.Ordinal));
 
             using var env = new StreamReader(archive.GetEntry("environment.txt")!.Open());
