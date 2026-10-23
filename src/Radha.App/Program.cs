@@ -322,7 +322,25 @@ internal sealed class SmokeProbe
     {
         if (Interlocked.Exchange(ref _completed, 1) != 0) return;
         Write("pass", detail, null);
-        Environment.Exit(0);
+
+        // Shut down through the XAML application, not ExitProcess. Tearing the process down from
+        // inside the message loop while composition objects are still alive is how a clean run
+        // reports STATUS_HEAP_CORRUPTION and a green test looks red.
+        try
+        {
+            Application.Current.Exit();
+        }
+        catch
+        {
+            Environment.Exit(0);
+        }
+
+        // If the loop does not unwind, the verdict is already on disk; leave rather than hang.
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(TimeSpan.FromSeconds(15)).ConfigureAwait(false);
+            Environment.Exit(0);
+        });
     }
 
     internal void Fail(string phase, Exception exception)

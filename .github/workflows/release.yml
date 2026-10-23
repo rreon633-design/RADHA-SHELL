@@ -223,6 +223,18 @@ jobs:
 
             $summary += @('## session', '```', "user: $env:USERNAME", "session: $((Get-Process -Id $PID).SessionId)", '```')
             Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ($summary -join "`n")
+
+            # The summary is only readable in a browser; annotations are readable from the API, so
+            # the same evidence is emitted both ways. Truncated because an annotation is not a log.
+            foreach ($file in @('smoke.json','startup.log')) {
+              $path = Join-Path $dir $file
+              if (Test-Path $path) {
+                $body = (Get-Content $path -Raw) -replace '%','%25'
+                $body = $body -replace "`r","" -replace "`n","%0A"
+                if ($body.Length -gt 1800) { $body = $body.Substring(0,1800) }
+                Write-Host "::notice title=$file::$body"
+              }
+            }
           } catch {
             Write-Host "diagnostics could not be collected: $_"
           }
