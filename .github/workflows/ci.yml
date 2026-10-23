@@ -14,11 +14,10 @@ name: ci
 # ones that exercise the unverified-as-of-phase-1 code.
 
 on:
+  # No paths-ignore: every push to main runs the full gate. A docs-only change still
+  # proves the tree is buildable, and it keeps the ci → release chain unconditional.
   push:
     branches: [main]
-    paths-ignore:
-      - 'docs/**'
-      - '**.md'
   pull_request:
     branches: [main]
   workflow_dispatch:
