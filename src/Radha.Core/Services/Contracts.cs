@@ -122,8 +122,18 @@ public interface ISystemMonitorService
 {
     SystemSample? Latest { get; }
     event EventHandler<SystemSample>? Sampled;
+
+    /// <summary>Fixed-rate sampling, for the benchmark harness and tests.</summary>
     void Start(TimeSpan interval);
+
     void Stop();
+
+    /// <summary>
+    /// "Something is looking at the numbers." Reading every sensor once a second is the single most
+    /// expensive thing this process does — LibreHardwareMonitor walks SMBus and opens handles — so
+    /// sampling drops to a slow heartbeat when nothing is on screen. Dispose the handle to release.
+    /// </summary>
+    IDisposable Subscribe();
 }
 
 public interface INetworkService

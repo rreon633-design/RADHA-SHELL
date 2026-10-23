@@ -45,6 +45,7 @@ public sealed class ShellHost : IAsyncDisposable
     private readonly IVpnService _vpn;
     private readonly ToastMirrorService _toastMirror;
     private readonly IWorkspaceService _workspaces;
+    private readonly IDisplayService _displays;
     private readonly IpcServer _ipc;
     private readonly string _auditLogPath;
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(1) };
@@ -116,6 +117,7 @@ public sealed class ShellHost : IAsyncDisposable
         _toastMirror = new ToastMirrorService(_notifications);
         _ = _toastMirror.StartAsync();
         _workspaces = _services.GetRequiredService<IWorkspaceService>();
+        _displays = _services.GetRequiredService<IDisplayService>();
 
         if (_theme is ThemeService themeService) themeService.Initialize(_config);
 
@@ -216,6 +218,31 @@ public sealed class ShellHost : IAsyncDisposable
     /// Append-only audit trail. Every field is redacted before it touches disk, and logging
     /// failures never affect command handling.
     /// </summary>
+    /// <summary>Runs a short-lived tool and reports success without surfacing its output.</summary>
+    private static bool RunQuiet(string file, IReadOnlyList<string> arguments)
+    {
+        try
+        {
+            var info = new System.Diagnostics.ProcessStartInfo(file)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+            foreach (var argument in arguments) info.ArgumentList.Add(argument);
+
+            using var process = System.Diagnostics.Process.Start(info);
+            if (process is null) return false;
+            if (!process.WaitForExit(5000)) { try { process.Kill(); } catch { } return false; }
+            return process.ExitCode == 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private void WriteAudit(IpcAudit audit)
     {
         try
@@ -436,6 +463,27 @@ public sealed class ShellHost : IAsyncDisposable
                         return args.FirstOrDefault() ?? "0";
                     case "uptime":
                         return _state.UptimeText;
+
+                    case "power":
+                        if (args.Length == 0)
+                            return PowerProfiles.TryParse(_config.Power.Profile, out var active)
+                                ? PowerProfiles.ToConfigString(active)
+                                : "balanced";
+
+                        if (!PowerProfiles.TryParse(args[0], out var requested))
+                            return "usage: radha system power [balanced|saver|performance]";
+
+                        // The overlay is a per-user setting; powercfg needs no elevation for it.
+                        if (!RunQuiet("powercfg.exe", PowerProfiles.PowercfgArguments(PowerProfiles.ToGuid(requested))))
+                            return "powercfg refused the change on this machine";
+
+                        _config.Power.Profile = PowerProfiles.ToConfigString(requested);
+                        _configStore.SavePreservingUnknown(_config);
+                        _state.ShowOsd("Power mode", requested == PowerProfile.Performance ? 100 : requested == PowerProfile.Saver ? 30 : 65);
+                        return _config.Power.Profile;
+
+                    case "screens":
+                        return JsonSerializer.Serialize(_displays.Monitors);
                     case "update-check":
                         return CheckUpdatesAsync().GetAwaiter().GetResult();
                 }

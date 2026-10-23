@@ -18,8 +18,13 @@ public sealed class SystemMonitorService : ISystemMonitorService, IDisposable
         IsStorageEnabled = true
     };
 
+    private static readonly TimeSpan ActiveInterval = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan IdleInterval = TimeSpan.FromSeconds(10);
+
     private readonly object _gate = new();
     private Timer? _timer;
+    private int _subscribers;
+    private bool _opened;
     private long _lastBytes;
     private DateTime _lastSample = DateTime.UtcNow;
     private readonly DateTime _bootTime = DateTime.UtcNow.AddMilliseconds(-Environment.TickCount64);
@@ -29,15 +34,69 @@ public sealed class SystemMonitorService : ISystemMonitorService, IDisposable
 
     public void Start(TimeSpan interval)
     {
-        if (_timer is not null) return;
+        lock (_gate)
+        {
+            if (_timer is not null) return;
+            OpenOnce();
+            _timer = new Timer(_ => Sample(), null, TimeSpan.Zero, interval);
+        }
+    }
+
+    public IDisposable Subscribe()
+    {
+        lock (_gate)
+        {
+            _subscribers++;
+            if (_timer is null)
+            {
+                OpenOnce();
+                _timer = new Timer(_ => Sample(), null, TimeSpan.Zero, ActiveInterval);
+            }
+            else if (_subscribers == 1)
+            {
+                _timer.Change(TimeSpan.Zero, ActiveInterval);
+            }
+        }
+
+        return new Subscription(this);
+    }
+
+    private void Release()
+    {
+        lock (_gate)
+        {
+            if (_subscribers > 0) _subscribers--;
+            // Nothing is looking: keep a slow heartbeat so the bar's readout does not go stale, but
+            // stop paying for a full sensor walk every second.
+            if (_subscribers == 0 && _timer is not null) _timer.Change(IdleInterval, IdleInterval);
+        }
+    }
+
+    private void OpenOnce()
+    {
+        if (_opened) return;
         try { _computer.Open(); } catch { /* sensors unavailable: still report RAM/disk/net */ }
-        _timer = new Timer(_ => Sample(), null, TimeSpan.Zero, interval);
+        _opened = true;
+    }
+
+    private sealed class Subscription(SystemMonitorService owner) : IDisposable
+    {
+        private int _disposed;
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0) owner.Release();
+        }
     }
 
     public void Stop()
     {
-        _timer?.Dispose();
-        _timer = null;
+        lock (_gate)
+        {
+            _timer?.Dispose();
+            _timer = null;
+            _subscribers = 0;
+        }
     }
 
     private void Sample()

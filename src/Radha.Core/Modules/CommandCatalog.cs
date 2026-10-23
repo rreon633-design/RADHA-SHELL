@@ -63,13 +63,13 @@ public static class CommandCatalog
             [ShellModule.ControlCenter] = new[] { "open", "close", "toggle" },
             [ShellModule.Notifications] = new[] { "open", "close", "toggle", "clear", "dnd-on", "dnd-off", "dnd-toggle", "dismiss", "action" },
             [ShellModule.Osd] = new[] { "volume", "brightness", "mic", "show" },
-            [ShellModule.Session] = new[] { "menu", "logout", "suspend", "reboot", "shutdown" },
+            [ShellModule.Session] = new[] { "menu", "logout", "suspend", "hibernate", "reboot", "shutdown" },
             [ShellModule.Media] = new[] { "play-pause", "next", "previous", "seek", "mute", "status" },
             [ShellModule.Wallpaper] = new[] { "set", "next", "random", "list", "current", "assign", "fit", "monitors" },
             [ShellModule.Theme] = new[] { "set", "variant", "dark", "light", "toggle", "status", "extract" },
             [ShellModule.Network] = new[] { "status", "wifi-toggle", "vpn-toggle", "wifi-list", "wifi-connect" },
             [ShellModule.Bluetooth] = new[] { "status", "toggle", "pair", "scan" },
-            [ShellModule.System] = new[] { "status", "volume", "brightness", "uptime", "update-check" },
+            [ShellModule.System] = new[] { "status", "volume", "brightness", "uptime", "update-check", "power", "screens" },
             [ShellModule.Config] = new[] { "get", "set", "path", "reload", "monitor-override", "doctor", "fix", "diagnostics", "profile" }
         };
 

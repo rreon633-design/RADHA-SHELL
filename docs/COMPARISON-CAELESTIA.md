@@ -42,16 +42,16 @@ Legend: **✅ parity** · **⚠️ partial** · **❌ not implemented** · **—
 | Bar popouts (active window, tray, status icons) | ⚠️ | tray icon + live Wi-Fi/Bluetooth/VPN glyphs; no active-window popout |
 | Scroll on bar: volume / brightness / workspaces | ✅ | `PointerWheelChanged` → volume or workspace step, configurable |
 | `Style layer`: rounded/translucent surfaces | ✅ | tokens + W10 acrylic |
-| Dashboard with tabs | ⚠️ | single page; no tab shell |
+| Dashboard with tabs | ✅ | Overview / Media / Performance / Wallpaper pivots |
 | Dashboard: media, performance, weather | ✅ | `DashboardView` |
 | Dashboard: lap counter, GPU/disk/network graphs | ⚠️ | graphs for CPU/GPU/RAM; no disk/network graphs |
 | Launcher: apps, fuzzy search | ✅ | `FuzzyMatcher` |
 | Launcher: wallpaper switcher, actions (`>`), calculator | ✅ | `LauncherEngine`: `>` actions, arithmetic row, dangerous-action gate |
 | Launcher: favourites / hidden apps / vim keybinds | ✅ | favourites float on an empty query; hidden filtered; j/k/g navigation |
-| Notification centre with groups, actions, expiry | ⚠️ | action buttons + DnD + policy engine in Core; list is still flat |
+| Notification centre with groups, actions, expiry | ✅ | app-run headers, action buttons, DnD, expiry policy in Core |
 | Sidebar / notification dock | ❌ | notifications are a centred panel only |
 | OSD (volume, brightness, mic) | ✅ | `OsdWindow` |
-| Session menu (logout/reboot/shutdown/suspend/hibernate) | ⚠️ | no hibernate, no confirmation flow |
+| Session menu (logout/reboot/shutdown/suspend/hibernate) | ✅ | all five; destructive actions arm-then-confirm with a 4 s expiry |
 | Lock screen (PAM, fingerprint, howdy) | — | **excluded on request** — no auth code in this repo |
 | Area picker (region screenshot) | ❌ | none |
 | Screen recording | ❌ | none |
@@ -70,15 +70,15 @@ Legend: **✅ parity** · **⚠️ partial** · **❌ not implemented** · **—
 | Lyrics (LRCLIB / NetEase / local) | ⚠️ | LRC parser + LRCLIB query builder tested; no fetch/UI yet |
 | Weather | ✅ | Open-Meteo + IP geolocation |
 | Network (NM: Wi-Fi, ethernet, VPN, profiles) | ⚠️ | Wi-Fi network list (`netsh`, parsed + tested) + radio + VPN; no ethernet detail |
-| Bluetooth (pair, connect, list) | ⚠️ | paired list + connect/disconnect; **no pairing flow** |
+| Bluetooth (pair, connect, list) | ✅ | paired list, connect/disconnect, unpaired scan and pairing |
 | System monitor (CPU, GPU, RAM, disk, net, temps) | ✅ | LibreHardwareMonitor |
 | Disk / network usage history | ⚠️ | current values only, no history |
 | Colours (`matugen`/smart scheme) | ✅ | own OKLab engine, 6 M3 variants |
 | Wallpapers (picker, random, per-monitor) | ✅ | thumbnail grid, `IDesktopWallpaper` per-monitor assignment, span/fit placement, rotation |
-| Screens (`Screens.qml` — refresh rate, scale) | ❌ | none |
+| Screens (`Screens.qml` — refresh rate, scale) | ⚠️ | reported per monitor (bounds, scale, Hz) by `system screens`; not settable |
 | Idle / idle-inhibit / auto-lock | ⚠️ | inhibit policy + `SetThreadExecutionState`; auto-lock excluded by instruction |
 | Session manager | ⚠️ | power actions only |
-| Game mode / power profiles | ❌ | none |
+| Game mode / power profiles | ⚠️ | power overlays done (balanced/saver/performance); no game-mode detection |
 | Battery warnings (configurable levels) | ✅ | `BatteryWatch` with hysteresis and re-arm, surfaced as a notification |
 | Updates page (package manager integration) | ⚠️ | GitHub release check with semver comparison; no package-manager integration |
 | Plugins | ❌ | no plugin model |
@@ -98,8 +98,8 @@ Legend: **✅ parity** · **⚠️ partial** · **❌ not implemented** · **—
 | Crash reports / issue templates | ⚠️ | redacted diagnostics bundle (config, logs, environment); no automatic crash handler |
 | Release automation | ✅ | CI + auto-CD release on every green `main` |
 
-**Score after the second batch:** of ~55 comparable surfaces and services, **32 are at parity, 12
-partial, 10 missing**, and 1 (lock screen) is excluded deliberately. What remains missing is almost
+**Score after the third batch:** of ~55 comparable surfaces and services, **36 are at parity, 11
+partial, 7 missing**, and 1 (lock screen) is excluded deliberately. What remains missing is almost
 entirely capture, previews, shader transitions and plugin surface.
 
 ---

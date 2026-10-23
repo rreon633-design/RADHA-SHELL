@@ -19,6 +19,7 @@ public sealed class ShellConfig
     public ServicesConfig Services { get; set; } = new();
     public WallpaperConfig Wallpaper { get; set; } = new();
     public BackgroundConfig Background { get; set; } = new();
+    public PowerConfig Power { get; set; } = new();
     public PathsConfig Paths { get; set; } = new();
 
     /// <summary>Clamp user-supplied numbers into ranges the UI can actually render.</summary>
@@ -215,6 +216,13 @@ public sealed class WallpaperConfig
 
     /// <summary>none | crossfade. Collapses to none when reduced motion is on.</summary>
     public string Transition { get; set; } = "crossfade";
+}
+
+/// <summary>Last power overlay the user chose, so the shell can report it back.</summary>
+public sealed class PowerConfig
+{
+    /// <summary>balanced | saver | performance</summary>
+    public string Profile { get; set; } = "balanced";
 }
 
 /// <summary>The shell's own layer behind the desktop icons: clock, visualiser, wallpaper cross-fade.</summary>

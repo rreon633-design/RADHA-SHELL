@@ -77,6 +77,8 @@ public sealed partial class DashboardViewModel : ObservableObject
     private const int HistoryLength = 60;
 
     private readonly ISystemMonitorService _system;
+    private readonly ShellState _state;
+    private IDisposable? _monitorLease;
     private readonly IWeatherService _weather;
     private readonly IMediaService _media;
     private readonly IAudioService _audio;
@@ -170,6 +172,11 @@ public sealed partial class DashboardViewModel : ObservableObject
 
         state.PropertyChanged += (_, e) =>
         {
+            if (e.PropertyName == nameof(ShellState.IsDashboardOpen))
+            {
+                UpdateSampling();
+                return;
+            }
             if (e.PropertyName != nameof(ShellState.Theme)) return;
             foreach (var tile in QuickTiles) tile.ApplyTheme(state.Theme);
             foreach (var hour in WeatherHours) hour.ApplyTheme(state.Theme);
@@ -179,9 +186,27 @@ public sealed partial class DashboardViewModel : ObservableObject
 
     public async Task InitializeAsync()
     {
-        _system.Start(TimeSpan.FromSeconds(1));
         try { await _weather.RefreshAsync(); } catch { /* offline is fine */ }
         SyncMedia();
+    }
+
+    /// <summary>
+    /// Sensor sampling is the most expensive recurring work in the process — LibreHardwareMonitor
+    /// walks SMBus and opens device handles — so the dashboard holds a lease only while it is on
+    /// screen. The service drops to a slow heartbeat when the last lease goes away, which means an
+    /// idle shell does not cook a laptop to draw a graph nobody is looking at.
+    /// </summary>
+    private void UpdateSampling()
+    {
+        if (_state.IsDashboardOpen)
+        {
+            _monitorLease ??= _system.Subscribe();
+        }
+        else
+        {
+            _monitorLease?.Dispose();
+            _monitorLease = null;
+        }
     }
 
     partial void OnActiveTabChanged(int value)

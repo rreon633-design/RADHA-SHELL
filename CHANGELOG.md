@@ -4,6 +4,16 @@ All notable changes to RADHA SHELL are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning is
 [SemVer](https://semver.org/).
 
+## Unreleased — power modes, safe session actions, cheaper telemetry
+
+- `radha system power [balanced|saver|performance]` drives the Windows power overlay; the shell
+  remembers the last choice so it can report it back. No elevation, no `powercfg` output parsing.
+- `radha system screens` reports every monitor's bounds, scale and refresh rate.
+- Session menu: hibernate added; restart, shut down and hibernate arm on the first press and run on
+  the second, with a four-second expiry, so an unsaved document cannot be one stray click away.
+- Sensor sampling is ref-counted: the dashboard holds a lease only while it is on screen, and the
+  service drops from 1 Hz to a 10 s heartbeat when nothing is watching.
+
 ## Unreleased — wallpapers you can actually see
 
 - Wallpaper picker: a thumbnail grid, cached on disk per (path, mtime, size), decoded off the

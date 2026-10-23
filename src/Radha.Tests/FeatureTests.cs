@@ -42,6 +42,7 @@ public static class FeatureTests
         ClockTests(check);
         LaunchGuardTests(check);
         WallpaperTests(check);
+        PowerAndConfirmTests(check);
     }
 
     // ---------------- design tokens ----------------
@@ -758,5 +759,49 @@ public static class FeatureTests
         {
             try { Directory.Delete(dir, true); } catch { }
         }
+    }
+
+    // ---------------- power profiles + confirmations ----------------
+
+    private static void PowerAndConfirmTests(Action<string, bool> check)
+    {
+        check("power: saver guid", PowerProfiles.ToGuid(PowerProfile.Saver) == "961cc777-2547-4f9d-8174-7d86181b8a7a");
+        check("power: performance guid", PowerProfiles.ToGuid(PowerProfile.Performance) == "ded574b5-45a0-4f42-8737-46345c09c238");
+        check("power: balanced is the zero guid", PowerProfiles.ToGuid(PowerProfile.Balanced) == "00000000-0000-0000-0000-000000000000");
+
+        check("power: parses alias", PowerProfiles.TryParse("EFFICIENCY", out var saver) && saver == PowerProfile.Saver);
+        check("power: parses performance", PowerProfiles.TryParse(" performance ", out var perf) && perf == PowerProfile.Performance);
+        check("power: rejects nonsense", !PowerProfiles.TryParse("turbo-boost", out _));
+        check("power: null is rejected", !PowerProfiles.TryParse(null, out _));
+        check("power: config string round-trips",
+            PowerProfiles.TryParse(PowerProfiles.ToConfigString(PowerProfile.Performance), out var round) && round == PowerProfile.Performance);
+
+        var args = PowerProfiles.PowercfgArguments(PowerProfiles.SaverGuid);
+        check("power: powercfg arguments", args.Count == 2 && args[0] == "/overlaysetactive" && args[1] == PowerProfiles.SaverGuid);
+        check("power: irrelevant on a desktop", !PowerProfiles.IsRelevant(hasBattery: false));
+
+        var guard = new ConfirmGuard(TimeSpan.FromSeconds(4));
+        var t0 = new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        check("confirm: first press only arms", !guard.Confirm("reboot", t0));
+        check("confirm: arm is visible", guard.ArmedAction == "reboot");
+        check("confirm: second press confirms", guard.Confirm("reboot", t0.AddSeconds(1)));
+        check("confirm: disarmed after use", guard.ArmedAction is null);
+        check("confirm: third press re-arms", !guard.Confirm("reboot", t0.AddSeconds(2)));
+
+        var stale = new ConfirmGuard(TimeSpan.FromSeconds(4));
+        stale.Confirm("shutdown", t0);
+        check("confirm: expiry forces a new arm", !stale.Confirm("shutdown", t0.AddSeconds(10)));
+
+        var swapped = new ConfirmGuard(TimeSpan.FromSeconds(4));
+        swapped.Confirm("shutdown", t0);
+        check("confirm: different action replaces the arm", !swapped.Confirm("reboot", t0.AddSeconds(1)));
+        check("confirm: replaced arm is the new action", swapped.ArmedAction == "reboot");
+
+        check("confirm: remaining shrinks", Math.Abs(swapped.RemainingSeconds(t0.AddSeconds(3)) - 2) < 0.01);
+        check("confirm: idle has no countdown", new ConfirmGuard().RemainingSeconds() == 0);
+
+        var threw = false;
+        try { new ConfirmGuard(TimeSpan.Zero); } catch (ArgumentOutOfRangeException) { threw = true; }
+        check("confirm: zero window rejected", threw);
     }
 }
