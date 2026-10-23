@@ -191,8 +191,9 @@ jobs:
           if (-not $exited) { Stop-Process -Id $proc.Id -Force }
           $code = if ($exited) { $proc.ExitCode } else { -1 }
           Write-Host "smoke exited $code (exited=$exited)"
-          "SMOKE_CODE=$code" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          "SMOKE_EXITED=$exited" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          # AppendAllText, not Out-File: PowerShell 5.1 writes a BOM with -Encoding utf8, and a BOM
+          # corrupts the first key of $GITHUB_ENV so the variable silently never exists.
+          [IO.File]::AppendAllText($env:GITHUB_ENV, "SMOKE_CODE=$code`nSMOKE_EXITED=$exited`n")
 
       # Everything that can explain a windowless launch, in one place, whether it passed or not.
       # The step summary is the only channel that survives to a reader without a login.
@@ -229,7 +230,7 @@ jobs:
           $summary += @('## session', '```', "user: $env:USERNAME", "session: $((Get-Process -Id $PID).SessionId)", "os: $((Get-CimInstance Win32_OperatingSystem).Caption)", '```')
           $summary -join "`n" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 
-          if ($env:SMOKE_CODE -ne '0') {
+          if ("$env:SMOKE_CODE" -ne '0') {
             Write-Host "::error::the shell could not open a window (exit $env:SMOKE_CODE); see the job summary"
             exit 1
           }
