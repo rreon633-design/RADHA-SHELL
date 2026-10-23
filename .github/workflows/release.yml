@@ -1,0 +1,128 @@
+name: release
+
+# RADHA SHELL — continuous delivery
+#
+# Triggered by pushing a version tag:
+#   git tag v0.1.0 && git push origin v0.1.0
+#
+# Produces a GitHub Release containing the compiled shell, the native bridge and the
+# compiled shaders, plus the palette CLI. No signing yet — artifacts are unsigned
+# development builds and must say so.
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version label for a manual build (e.g. v0.1.0-dev)'
+        required: true
+        default: 'v0.0.0-dev'
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_NOLOGO: 1
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+
+jobs:
+  build:
+    name: build release artifacts
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Run core tests before shipping
+        run: |
+          dotnet build src/Radha.Tests/Radha.Tests.csproj -c Release
+          dotnet run --project src/Radha.Tests -c Release --no-build
+
+      - name: Publish WinUI shell
+        run: >
+          dotnet publish src/Radha.App/Radha.App.csproj
+          -c Release -p:Platform=x64 -r win-x64 --self-contained true
+          -p:WindowsAppSDKSelfContained=true
+          -o publish/app
+
+      - name: Publish CLI
+        run: >
+          dotnet publish src/Radha.Cli/Radha.Cli.csproj
+          -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true -o publish/cli
+
+      - name: Build native bridge
+        run: |
+          cmake -B build -S src/Radha.Native -A x64
+          cmake --build build --config Release
+          Copy-Item build/Release/RadhaNative.dll publish/app/ -Force
+
+      - name: Compile shaders
+        shell: pwsh
+        run: |
+          $fxc = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter fxc.exe |
+                 Where-Object { $_.FullName -match 'x64' } | Select-Object -First 1
+          New-Item -ItemType Directory -Force -Path publish/app/assets | Out-Null
+          Get-ChildItem src\Radha.Shaders\*.hlsl | ForEach-Object {
+            & $fxc.FullName /nologo /T ps_5_0 /E main /Fo "publish\app\assets\$($_.BaseName).cso" $_.FullName
+            if ($LASTEXITCODE -ne 0) { throw "shader $($_.Name) failed" }
+          }
+
+      - name: Add config sample + notice
+        shell: pwsh
+        run: |
+          Copy-Item examples/shell.json publish/app/shell.sample.json
+          @"
+          RADHA SHELL — unsigned development build
+          ========================================
+          Run:      Radha.App.exe
+          Control:  cli\radha.exe dashboard toggle
+          Config:   %APPDATA%\Radha\shell.json  (see shell.sample.json)
+
+          No lock screen. No Explorer replacement. See docs/ROADMAP.md.
+          "@ | Set-Content publish/app/BUILD-NOTICE.txt -Encoding utf8
+
+      - name: Compose archive
+        shell: pwsh
+        run: Compress-Archive -Path publish/app/*, publish/cli/* -DestinationPath RadhaShell-win-x64.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RadhaShell-win-x64
+          path: RadhaShell-win-x64.zip
+          retention-days: 30
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: RADHA SHELL ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          files: RadhaShell-win-x64.zip
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          body: |
+            ## RADHA SHELL ${{ github.ref_name }}
+
+            Native Windows shell: WinUI 3 · Composition · Win2D · HLSL · C++/WinRT.
+            **No HTML/CSS/JS.**
+
+            ### Verified in this build
+            - core palette engine, config store, IPC protocol, CLI — test suite passed
+            - WinUI 3 app + C++/WinRT bridge + HLSL shaders compiled on Windows
+
+            ### Contents
+            | Path | What |
+            |---|---|
+            | `Radha.App.exe` | the shell (bar, dashboard, launcher, control centre, OSD) |
+            | `cli/radha.exe` | command-line control (`radha dashboard toggle`) |
+            | `RadhaNative.dll` | app-bar docking, DWM effects, global hotkeys |
+            | `assets/*.cso` | compiled shaders |
+            | `shell.sample.json` | configuration reference |
+
+            Unsigned development build. No lock screen; no Explorer replacement.

@@ -1,0 +1,403 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Radha.App.Views.DashboardView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Radha.App.Controls">
+
+    <Border Background="{Binding State.Theme.SurfaceGlass}"
+            BorderBrush="{Binding State.Theme.OutlineVariant}"
+            BorderThickness="1" CornerRadius="30" Padding="18">
+        <Pivot x:Name="Tabs" Background="Transparent" Margin="0,-6,0,0">
+
+            <!-- ============ OVERVIEW ============ -->
+            <PivotItem Header="Overview">
+                <Grid ColumnSpacing="12" RowSpacing="12" Height="440">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="280" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="300" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- profile / uptime / live stats -->
+                    <Border Grid.Column="0" Background="{Binding State.Theme.SurfaceContainer}"
+                            CornerRadius="22" Padding="14">
+                        <StackPanel Spacing="12">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <Border Width="52" Height="52" CornerRadius="26"
+                                        Background="{Binding State.Theme.AccentGradient}">
+                                    <TextBlock Text="{Binding State.UserName}" FontSize="18"
+                                               FontWeight="SemiBold" Foreground="{Binding State.Theme.OnPrimary}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Max" FontSize="16" FontWeight="SemiBold"
+                                               Foreground="{Binding State.Theme.OnSurface}" />
+                                    <TextBlock Text="RADHA SHELL · Windows"
+                                               FontSize="10" Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                                </StackPanel>
+                            </StackPanel>
+
+                            <Border Background="{Binding State.Theme.SurfaceContainerHigh}" CornerRadius="16" Padding="12">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="UPTIME" FontSize="9" CharacterSpacing="80"
+                                               Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                                    <TextBlock Text="{Binding State.UptimeText}" FontSize="20"
+                                               FontFamily="{StaticResource RadhaMono}"
+                                               Foreground="{Binding State.Theme.OnSurface}" />
+                                </StackPanel>
+                            </Border>
+
+                            <StackPanel Spacing="9">
+                                <StackPanel Spacing="3">
+                                    <Grid>
+                                        <TextBlock Text="CPU" FontSize="10" Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                                        <TextBlock Text="{Binding CpuText}" FontSize="10" FontWeight="SemiBold"
+                                                   HorizontalAlignment="Right" Foreground="{Binding State.Theme.OnSurface}" />
+                                    </Grid>
+                                    <ProgressBar Value="{Binding CpuPercent}" Height="3" CornerRadius="2"
+                                                 Foreground="{Binding State.Theme.Primary}" Background="{Binding State.Theme.SurfaceContainerHighest}" />
+                                </StackPanel>
+                                <StackPanel Spacing="3">
+                                    <Grid>
+                                        <TextBlock Text="GPU" FontSize="10" Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                                        <TextBlock Text="{Binding GpuText}" FontSize="10" FontWeight="SemiBold"
+                                                   HorizontalAlignment="Right" Foreground="{Binding State.Theme.OnSurface}" />
+                                    </Grid>
+                                    <ProgressBar Value="{Binding GpuPercent}" Height="3" CornerRadius="2"
+                                                 Foreground="{Binding State.Theme.Tertiary}" Background="{Binding State.Theme.SurfaceContainerHighest}" />
+                                </StackPanel>
+                                <StackPanel Spacing="3">
+                                    <Grid>
+                                        <TextBlock Text="MEMORY" FontSize="10" Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                                        <TextBlock Text="{Binding MemoryText}" FontSize="10" FontWeight="SemiBold"
+                                                   HorizontalAlignment="Right" Foreground="{Binding State.Theme.OnSurface}" />
+                                    </Grid>
+                                    <ProgressBar Value="{Binding MemoryPercent}" Height="3" CornerRadius="2"
+                                                 Foreground="{Binding State.Theme.SecondaryContainer}" Background="{Binding State.Theme.SurfaceContainerHighest}" />
+                                </StackPanel>
+                            </StackPanel>
+
+                            <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                    Background="{Binding State.Theme.SurfaceContainerHigh}" BorderThickness="0"
+                                    CornerRadius="14" Padding="12,9"
+                                    Command="{Binding State.ToggleDndCommand}">
+                                <Grid>
+                                    <StackPanel Spacing="1">
+                                        <TextBlock Text="Do not disturb" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{Binding State.Theme.OnSurface}" />
+                                        <TextBlock Text="Silence toasts" FontSize="9"
+                                                   Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                                    </StackPanel>
+                                    <FontIcon Glyph="&#xE7ED;" FontSize="14" HorizontalAlignment="Right"
+                                              Foreground="{Binding State.Theme.Primary}" />
+                                </Grid>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- quick settings + sliders -->
+                    <Border Grid.Column="1" Background="{Binding State.Theme.SurfaceContainer}"
+                            CornerRadius="22" Padding="14">
+                        <Grid RowSpacing="12">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <ItemsRepeater ItemsSource="{Binding QuickTiles}">
+                                <ItemsRepeater.Layout>
+                                    <UniformGridLayout MinItemWidth="96" MinItemHeight="72" ItemsStretch="Fill"
+                                                       MinColumnSpacing="9" MinRowSpacing="9" />
+                                </ItemsRepeater.Layout>
+                                <ItemsRepeater.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Click="OnTileClick" Padding="11" CornerRadius="17"
+                                                HorizontalContentAlignment="Stretch" BorderThickness="0"
+                                                Background="{Binding TileBrush}">
+                                            <StackPanel Spacing="6">
+                                                <Border Width="28" Height="28" CornerRadius="9"
+                                                        Background="{Binding IconBackground}">
+                                                    <FontIcon Glyph="{Binding Glyph}" FontSize="14"
+                                                              Foreground="{Binding IconBrush}" />
+                                                </Border>
+                                                <TextBlock Text="{Binding Label}" FontSize="10"
+                                                           Foreground="{Binding DataContext.State.Theme.OnSurface}" />
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsRepeater.ItemTemplate>
+                            </ItemsRepeater>
+
+                            <StackPanel Grid.Row="1" Spacing="8">
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="26" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="34" />
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE767;" FontSize="13" Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding Volume, Mode=TwoWay}"
+                                            StepFrequency="1" Foreground="{Binding State.Theme.Primary}" />
+                                    <TextBlock Grid.Column="2" Text="{Binding Volume}" FontSize="10"
+                                               HorizontalAlignment="Right" VerticalAlignment="Center"
+                                               Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                                </Grid>
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="26" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="34" />
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE706;" FontSize="13" Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding Brightness, Mode=TwoWay}"
+                                            StepFrequency="1" Foreground="{Binding State.Theme.Primary}" />
+                                    <TextBlock Grid.Column="2" Text="{Binding Brightness}" FontSize="10"
+                                               HorizontalAlignment="Right" VerticalAlignment="Center"
+                                               Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                                </Grid>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- weather + notifications preview -->
+                    <StackPanel Grid.Column="2" Spacing="12">
+                        <Border Background="{Binding State.Theme.SurfaceContainer}" CornerRadius="22" Padding="14">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="{Binding WeatherCity}" FontSize="12" FontWeight="SemiBold"
+                                           Foreground="{Binding State.Theme.OnSurface}" />
+                                <Grid Margin="0,4,0,0">
+                                    <TextBlock Text="{Binding WeatherTemp}" FontSize="38" FontWeight="Light"
+                                               Foreground="{Binding State.Theme.OnSurface}" />
+                                    <FontIcon Glyph="{Binding WeatherGlyph}" FontSize="34"
+                                              HorizontalAlignment="Right" VerticalAlignment="Top"
+                                              Foreground="{Binding State.Theme.Primary}" />
+                                </Grid>
+                                <TextBlock Text="{Binding WeatherCondition}" FontSize="10"
+                                           Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                                <TextBlock Text="{Binding WeatherHighLow}" FontSize="9"
+                                           Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                                <ItemsRepeater ItemsSource="{Binding WeatherHours}" Margin="0,8,0,0">
+                                    <ItemsRepeater.Layout>
+                                        <UniformGridLayout MinItemWidth="52" MinItemHeight="54" ItemsStretch="Fill" />
+                                    </ItemsRepeater.Layout>
+                                    <ItemsRepeater.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Spacing="2" HorizontalAlignment="Center">
+                                                <TextBlock Text="{Binding Label}" FontSize="9"
+                                                           Foreground="{Binding LabelBrush}" />
+                                                <FontIcon Glyph="{Binding Glyph}" FontSize="13"
+                                                          Foreground="{Binding IconBrush}" />
+                                                <TextBlock Text="{Binding TempText}" FontSize="10" FontWeight="SemiBold"
+                                                           Foreground="{Binding IconBrush}" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsRepeater.ItemTemplate>
+                                </ItemsRepeater>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{Binding State.Theme.SurfaceContainer}" CornerRadius="22" Padding="14">
+                            <StackPanel Spacing="8">
+                                <Grid>
+                                    <TextBlock Text="Notifications" FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{Binding State.Theme.OnSurface}" />
+                                    <Button Content="View all" FontSize="9" Padding="6,2" BorderThickness="0"
+                                            Background="Transparent" Foreground="{Binding State.Theme.Primary}"
+                                            HorizontalAlignment="Right"
+                                            Command="{Binding State.ToggleNotificationsCommand}" />
+                                </Grid>
+                                <ItemsControl ItemsSource="{Binding State.Notifications}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Spacing="1" Margin="0,3">
+                                                <TextBlock Text="{Binding Title}" FontSize="10" FontWeight="SemiBold"
+                                                           Foreground="{Binding TitleBrush}" />
+                                                <TextBlock Text="{Binding Body}" FontSize="9" Opacity="0.65"
+                                                           Foreground="{Binding BodyBrush}"
+                                                           TextTrimming="CharacterEllipsis" MaxLines="1" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="Nothing new" FontSize="9" Opacity="0.6"
+                                           Visibility="{Binding State.HasNotifications, Converter={StaticResource InverseBoolToVisibility}}" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+            </PivotItem>
+
+            <!-- ============ MEDIA ============ -->
+            <PivotItem Header="Media">
+                <Grid ColumnSpacing="12" Height="440">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="300" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" CornerRadius="24" Background="{Binding State.Theme.AccentGradient}">
+                        <StackPanel VerticalAlignment="Bottom" Padding="18" Spacing="2">
+                            <TextBlock Text="{Binding TrackTitle}" FontSize="15" FontWeight="SemiBold"
+                                       Foreground="{Binding State.Theme.OnPrimary}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding TrackArtist}" FontSize="11" Opacity="0.85"
+                                       Foreground="{Binding State.Theme.OnPrimary}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="1" Background="{Binding State.Theme.SurfaceContainer}"
+                            CornerRadius="24" Padding="18">
+                        <Grid RowSpacing="10">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <StackPanel>
+                                <TextBlock Text="{Binding TrackTitle}" FontSize="24" FontWeight="SemiBold"
+                                           Foreground="{Binding State.Theme.OnSurface}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding TrackArtist}" FontSize="12"
+                                           Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                            </StackPanel>
+
+                            <controls:SpectrumBars Grid.Row="1" Values="{Binding Spectrum}"
+                                                   Accent="{Binding State.Theme.PrimaryColor}" />
+
+                            <StackPanel Grid.Row="2" Spacing="4">
+                                <ProgressBar Value="{Binding ProgressPercent}" Height="4" CornerRadius="2"
+                                             Foreground="{Binding State.Theme.Primary}"
+                                             Background="{Binding State.Theme.SurfaceContainerHighest}" />
+                                <Grid>
+                                    <TextBlock Text="{Binding PositionText}" FontSize="9"
+                                               Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                                    <TextBlock Text="{Binding DurationText}" FontSize="9" HorizontalAlignment="Right"
+                                               Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                                </Grid>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
+                                <Button Width="36" Height="36" Padding="0" CornerRadius="18" BorderThickness="0"
+                                        Background="{Binding State.Theme.SurfaceContainerHighest}"
+                                        Command="{Binding State.PreviousTrackCommand}">
+                                    <FontIcon Glyph="&#xE892;" FontSize="13" Foreground="{Binding State.Theme.OnSurface}" />
+                                </Button>
+                                <Button Width="50" Height="50" Padding="0" CornerRadius="25" BorderThickness="0"
+                                        Background="{Binding State.Theme.Primary}"
+                                        Command="{Binding State.PlayPauseCommand}">
+                                    <FontIcon Glyph="&#xE768;" FontSize="20" Foreground="{Binding State.Theme.OnPrimary}" />
+                                </Button>
+                                <Button Width="36" Height="36" Padding="0" CornerRadius="18" BorderThickness="0"
+                                        Background="{Binding State.Theme.SurfaceContainerHighest}"
+                                        Command="{Binding State.NextTrackCommand}">
+                                    <FontIcon Glyph="&#xE893;" FontSize="13" Foreground="{Binding State.Theme.OnSurface}" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </PivotItem>
+
+            <!-- ============ PERFORMANCE ============ -->
+            <PivotItem Header="Performance">
+                <Grid RowSpacing="12" ColumnSpacing="12" Height="440">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Row="0" Grid.Column="0" Background="{Binding State.Theme.SurfaceContainer}"
+                            CornerRadius="22" Padding="14">
+                        <StackPanel Spacing="4">
+                            <Grid>
+                                <TextBlock Text="CPU" FontSize="10" FontWeight="SemiBold"
+                                           Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                                <TextBlock Text="{Binding CpuText}" FontSize="16" FontWeight="SemiBold"
+                                           HorizontalAlignment="Right" Foreground="{Binding State.Theme.OnSurface}" />
+                            </Grid>
+                            <controls:LineGraph Height="120" Values="{Binding CpuHistory}"
+                                                Accent="{Binding State.Theme.PrimaryColor}" />
+                            <TextBlock Text="{Binding TemperatureText}" FontSize="9"
+                                       Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Row="0" Grid.Column="1" Background="{Binding State.Theme.SurfaceContainer}"
+                            CornerRadius="22" Padding="14">
+                        <StackPanel Spacing="4">
+                            <Grid>
+                                <TextBlock Text="GPU" FontSize="10" FontWeight="SemiBold"
+                                           Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                                <TextBlock Text="{Binding GpuText}" FontSize="16" FontWeight="SemiBold"
+                                           HorizontalAlignment="Right" Foreground="{Binding State.Theme.OnSurface}" />
+                            </Grid>
+                            <controls:LineGraph Height="120" Values="{Binding GpuHistory}"
+                                                Accent="{Binding State.Theme.TertiaryColor}" />
+                            <TextBlock Text="LibreHardwareMonitor" FontSize="9"
+                                       Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Row="0" Grid.Column="2" Background="{Binding State.Theme.SurfaceContainer}"
+                            CornerRadius="22" Padding="14">
+                        <StackPanel Spacing="4">
+                            <Grid>
+                                <TextBlock Text="MEMORY" FontSize="10" FontWeight="SemiBold"
+                                           Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                                <TextBlock Text="{Binding MemoryText}" FontSize="12" FontWeight="SemiBold"
+                                           HorizontalAlignment="Right" Foreground="{Binding State.Theme.OnSurface}" />
+                            </Grid>
+                            <controls:LineGraph Height="120" Values="{Binding MemoryHistory}"
+                                                Accent="{Binding State.Theme.SecondaryContainer}" />
+                            <TextBlock Text="Working set" FontSize="9"
+                                       Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Row="1" Grid.Column="0" Background="{Binding State.Theme.SurfaceContainer}"
+                            CornerRadius="22" Padding="14">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="NETWORK" FontSize="10" FontWeight="SemiBold"
+                                       Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                            <TextBlock Text="{Binding NetworkText}" FontSize="20" FontWeight="Light"
+                                       Foreground="{Binding State.Theme.OnSurface}" />
+                            <TextBlock Text="Downstream throughput" FontSize="9"
+                                       Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Row="1" Grid.Column="1" Background="{Binding State.Theme.SurfaceContainer}"
+                            CornerRadius="22" Padding="14">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="STORAGE" FontSize="10" FontWeight="SemiBold"
+                                       Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                            <TextBlock Text="{Binding StorageText}" FontSize="20" FontWeight="Light"
+                                       Foreground="{Binding State.Theme.OnSurface}" />
+                            <ProgressBar Value="{Binding StoragePercent}" Height="4" CornerRadius="2"
+                                         Foreground="{Binding State.Theme.Primary}"
+                                         Background="{Binding State.Theme.SurfaceContainerHighest}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Row="1" Grid.Column="2" Background="{Binding State.Theme.SurfaceContainer}"
+                            CornerRadius="22" Padding="14">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="BATTERY" FontSize="10" FontWeight="SemiBold"
+                                       Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                            <TextBlock Text="{Binding State.BatteryPercent}" FontSize="24" FontWeight="Light"
+                                       Foreground="{Binding State.Theme.OnSurface}" />
+                            <TextBlock Text="Windows power &amp; battery API" FontSize="9"
+                                       Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </PivotItem>
+        </Pivot>
+    </Border>
+</UserControl>

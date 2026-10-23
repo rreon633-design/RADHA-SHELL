@@ -1,0 +1,276 @@
+name: ci
+
+# RADHA SHELL — continuous integration
+#
+# What this pipeline proves on every push:
+#   1. core      — the portable engine (palettes, config, IPC, CLI) builds and all assertions pass
+#   2. invariant — the repo contains no HTML/CSS/JS (the "native only" contract from the PRD)
+#   3. xaml      — every .xaml / .csproj / manifest is well-formed XML
+#   4. winui     — the WinUI 3 app compiles on real Windows (this is the honest gate for UI code)
+#   5. native    — the C++/WinRT bridge compiles with MSVC
+#   6. shaders   — every HLSL file compiles to a pixel shader
+#
+# Jobs 1–3 run on Linux (fast, always available). Jobs 4–6 run on Windows and are the
+# ones that exercise the unverified-as-of-phase-1 code.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: 1
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+
+jobs:
+  # ---------------------------------------------------------------- core
+  core:
+    name: core · build + test (linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Restore
+        # Restoring the test project also restores Core and the CLI via ProjectReference.
+        run: dotnet restore src/Radha.Tests/Radha.Tests.csproj
+
+      - name: Build (warnings as errors)
+        run: |
+          dotnet build src/Radha.Tests/Radha.Tests.csproj -c Release --no-restore \
+            -p:TreatWarningsAsErrors=true
+
+      - name: Run test suite
+        run: dotnet run --project src/Radha.Tests -c Release --no-build | tee core-tests.log
+
+      - name: CLI smoke test — palette extraction
+        run: |
+          dotnet run --project src/Radha.Cli -c Release --no-build -- \
+            scheme extract src/Radha.Tests/fixtures/quadrant.png --variant vibrant --json \
+            | tee palette.json
+          python3 - <<'PY'
+          import json, sys
+          data = json.load(open("palette.json"))
+          roles = data["roles"]
+          assert len(roles) == 35, f"expected 35 roles, got {len(roles)}"
+          for key in ("primary", "onPrimary", "surface", "onSurface", "error"):
+              assert key in roles, f"missing role {key}"
+              assert roles[key].startswith("#") and len(roles[key]) == 7, f"bad hex for {key}"
+          assert data["seed"].startswith("#")
+          print(f"palette OK · seed {data['seed']} · primary {roles['primary']} · {len(roles)} roles")
+          PY
+
+      - name: CLI rejects invalid input
+        run: |
+          set +e
+          dotnet run --project src/Radha.Cli -c Release --no-build -- theme explode 2>err.txt
+          code=$?
+          set -e
+          test "$code" -eq 1 || { echo "expected exit 1, got $code"; cat err.txt; exit 1; }
+          grep -q "not a valid command" err.txt
+          echo "invalid command correctly rejected"
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-logs
+          path: |
+            core-tests.log
+            palette.json
+            err.txt
+          retention-days: 7
+
+  # ----------------------------------------------------------- invariants
+  invariants:
+    name: invariants · native-only + xml
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: No web tech in the shell
+        run: |
+          # The PRD forbids HTML/CSS/JS/Electron/Tauri for the shell itself.
+          # docs may mention them; source may not contain them.
+          offenders=$(find src -type f \( -name '*.html' -o -name '*.htm' -o -name '*.css' \
+                        -o -name '*.js' -o -name '*.jsx' -o -name '*.ts' -o -name '*.tsx' \
+                        -o -name 'package.json' -o -name 'vite.config.*' \) || true)
+          if [ -n "$offenders" ]; then
+            echo "Forbidden web artefacts found in src/:"; echo "$offenders"; exit 1
+          fi
+          if find src -name '*.csproj' -exec grep -l 'UseWPF\|Electron\|WebView2' {} \; | grep -q .; then
+            echo "Forbidden UI framework reference found"; exit 1
+          fi
+          echo "native-only invariant holds"
+
+      - name: Validate XML (xaml, csproj, props, manifest)
+        run: |
+          python3 - <<'PY'
+          import glob, sys, xml.etree.ElementTree as ET
+          files = (glob.glob("src/**/*.xaml", recursive=True)
+                   + glob.glob("src/**/*.csproj", recursive=True)
+                   + glob.glob("src/**/*.props", recursive=True)
+                   + glob.glob("src/**/*.manifest", recursive=True))
+          bad = []
+          for f in files:
+              try:
+                  ET.parse(f)
+              except Exception as e:
+                  bad.append((f, e))
+          for f, e in bad:
+              print(f"INVALID {f}: {e}")
+          print(f"checked {len(files)} files, {len(bad)} invalid")
+          sys.exit(1 if bad else 0)
+          PY
+
+      - name: Validate JSON (configs, workflows)
+        run: |
+          python3 - <<'PY'
+          import glob, json, sys
+          files = glob.glob("examples/*.json") + glob.glob("**/*.json", recursive=True)
+          bad = []
+          for f in set(files):
+              if "bin/" in f or "obj/" in f:
+                  continue
+              try:
+                  json.load(open(f))
+              except Exception as e:
+                  bad.append((f, e))
+          for f, e in bad:
+              print(f"INVALID {f}: {e}")
+          print(f"checked {len(set(files))} json files, {len(bad)} invalid")
+          sys.exit(1 if bad else 0)
+          PY
+
+  # --------------------------------------------------------------- winui
+  winui:
+    name: winui · compile shell (windows)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Show SDK info
+        run: dotnet --info
+
+      - name: Restore
+        run: dotnet restore src/Radha.App/Radha.App.csproj -p:Platform=x64
+
+      - name: Build WinUI shell
+        run: >
+          dotnet build src/Radha.App/Radha.App.csproj
+          -c Release -p:Platform=x64 --no-restore
+          -p:TreatWarningsAsErrors=false
+
+      - name: Upload app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Radha.App-win-x64
+          path: src/Radha.App/bin/x64/Release/**
+          if-no-files-found: warn
+          retention-days: 7
+
+  # -------------------------------------------------------------- native
+  native:
+    name: native · c++ bridge (windows)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build -S src/Radha.Native -A x64
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Verify export surface
+        shell: pwsh
+        run: |
+          $dll = Get-ChildItem build -Recurse -Filter RadhaNative.dll | Select-Object -First 1
+          if (-not $dll) { throw "RadhaNative.dll was not produced" }
+          Write-Host "built $($dll.FullName) ($([math]::Round($dll.Length/1kb)) KB)"
+
+      - name: Upload bridge
+        uses: actions/upload-artifact@v4
+        with:
+          name: RadhaNative-win-x64
+          path: build/Release/RadhaNative.dll
+          if-no-files-found: warn
+          retention-days: 7
+
+  # ------------------------------------------------------------- shaders
+  shaders:
+    name: shaders · hlsl compile (windows)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile with fxc
+        shell: pwsh
+        run: |
+          $fxc = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter fxc.exe |
+                 Where-Object { $_.FullName -match 'x64' } | Select-Object -First 1
+          if (-not $fxc) { throw "fxc.exe not found in the Windows SDK" }
+          Write-Host "using $($fxc.FullName)"
+
+          New-Item -ItemType Directory -Force -Path out\shaders | Out-Null
+          $failed = 0
+          Get-ChildItem src\Radha.Shaders\*.hlsl | ForEach-Object {
+            $out = "out\shaders\$($_.BaseName).cso"
+            & $fxc.FullName /nologo /T ps_5_0 /E main /Fo $out $_.FullName
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "FAILED $($_.Name)" -ForegroundColor Red
+              $failed++
+            } else {
+              Write-Host "OK $($_.Name) → $([math]::Round((Get-Item $out).Length/1kb)) KB"
+            }
+          }
+          if ($failed -gt 0) { throw "$failed shader(s) failed to compile" }
+
+      - name: Upload compiled shaders
+        uses: actions/upload-artifact@v4
+        with:
+          name: shaders-cso
+          path: out/shaders/*.cso
+          retention-days: 7
+
+  # --------------------------------------------------------------- gate
+  ci-gate:
+    name: ci · all checks
+    needs: [core, invariants, winui, native, shaders]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any required job failed
+        run: |
+          results=("${{ needs.core.result }}" "${{ needs.invariants.result }}" \
+                   "${{ needs.winui.result }}" "${{ needs.native.result }}" "${{ needs.shaders.result }}")
+          echo "core=${results[0]} invariants=${results[1]} winui=${results[2]} native=${results[3]} shaders=${results[4]}"
+          for r in "${results[@]}"; do
+            if [ "$r" != "success" ]; then
+              echo "::error::a required job did not succeed ($r)"
+              exit 1
+            fi
+          done
+          echo "all checks passed"

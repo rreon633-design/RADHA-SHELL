@@ -1,0 +1,9 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+artifacts/
+publish/
+build/
+.DS_Store

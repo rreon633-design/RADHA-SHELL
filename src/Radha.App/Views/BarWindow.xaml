@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="Radha.App.Views.BarWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid x:Name="Root" Height="42" Background="{Binding Theme.BarGlass}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <!-- left: logo · workspaces · active window -->
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6"
+                    VerticalAlignment="Center" Margin="8,0,0,0">
+
+            <Button x:Name="LogoButton" Width="30" Height="30" Padding="0"
+                    CornerRadius="10" BorderThickness="0"
+                    Background="{Binding Theme.AccentGradient}"
+                    ToolTipService.ToolTip="Dashboard"
+                    Click="OnDashboardClick">
+                <FontIcon Glyph="&#xE8FD;" FontSize="15" Foreground="{Binding Theme.OnPrimary}" />
+            </Button>
+
+            <!-- Workspace pills are built in code-behind so they can morph size and
+                 follow the dynamic scheme (DataTemplate name-scope cannot see theming). -->
+            <StackPanel x:Name="WorkspaceStrip" Orientation="Horizontal" Spacing="2"
+                        VerticalAlignment="Center" />
+            <Border Width="1" Height="16" Background="{Binding Theme.OutlineVariant}" Margin="2,0" />
+
+            <Button Padding="8,4" BorderThickness="0" CornerRadius="9" Background="Transparent"
+                    Click="OnDashboardClick">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <FontIcon Glyph="&#xE737;" FontSize="12" Foreground="{Binding Theme.OnSurfaceVariant}" />
+                    <TextBlock Text="{Binding ActiveWindowTitle}" FontSize="11"
+                               Foreground="{Binding Theme.OnSurfaceVariant}"
+                               MaxWidth="220" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+            </Button>
+        </StackPanel>
+
+        <!-- centre: now-playing pill -->
+        <Button Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center"
+                Padding="5,3,12,3" CornerRadius="15" BorderThickness="0"
+                Background="{Binding Theme.TileOff}"
+                Command="{Binding ToggleDashboardCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Border Width="22" Height="22" CornerRadius="8"
+                        Background="{Binding Theme.AccentGradient}" />
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="{Binding MediaTitle}" FontSize="10.5" FontWeight="SemiBold"
+                               Foreground="{Binding Theme.OnSurface}" MaxWidth="190"
+                               TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding MediaArtist}" FontSize="9"
+                               Foreground="{Binding Theme.OnSurfaceVariant}" MaxWidth="190"
+                               TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <FontIcon Glyph="&#xE768;" FontSize="10" Foreground="{Binding Theme.Primary}"
+                          VerticalAlignment="Center" />
+            </StackPanel>
+        </Button>
+
+        <!-- right: tray · battery · clock · power -->
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2"
+                    VerticalAlignment="Center" Margin="0,0,8,0">
+
+            <Button Width="28" Height="28" Padding="0" BorderThickness="0" CornerRadius="9"
+                    Background="Transparent" ToolTipService.ToolTip="Network"
+                    Click="OnControlCenterClick">
+                <FontIcon Glyph="&#xE701;" FontSize="13" Foreground="{Binding Theme.OnSurfaceVariant}" />
+            </Button>
+
+            <Button Width="28" Height="28" Padding="0" BorderThickness="0" CornerRadius="9"
+                    Background="Transparent" ToolTipService.ToolTip="Bluetooth"
+                    Click="OnControlCenterClick">
+                <FontIcon Glyph="&#xE702;" FontSize="13" Foreground="{Binding Theme.OnSurfaceVariant}" />
+            </Button>
+
+            <Button Width="28" Height="28" Padding="0" BorderThickness="0" CornerRadius="9"
+                    Background="Transparent"
+                    Command="{Binding ToggleNotificationsCommand}"
+                    ToolTipService.ToolTip="Notifications">
+                <Grid>
+                    <FontIcon Glyph="&#xEA8F;" FontSize="14" Foreground="{Binding Theme.OnSurfaceVariant}" />
+                    <Ellipse Width="6" Height="6" Fill="{Binding Theme.Error}"
+                             HorizontalAlignment="Right" VerticalAlignment="Top"
+                             Visibility="{Binding HasNotifications, Converter={StaticResource BoolToVisibility}}" />
+                </Grid>
+            </Button>
+
+            <Button Padding="7,4" BorderThickness="0" CornerRadius="9" Background="Transparent"
+                    Click="OnControlCenterClick" ToolTipService.ToolTip="Battery">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <FontIcon Glyph="&#xE83F;" FontSize="14" Foreground="{Binding Theme.OnSurface}" />
+                    <TextBlock Text="{Binding BatteryPercent}" FontSize="10.5" FontWeight="SemiBold"
+                               Foreground="{Binding Theme.OnSurface}" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+
+            <Button Padding="8,3" BorderThickness="0" CornerRadius="9" Background="Transparent"
+                    Command="{Binding ToggleDashboardCommand}" ToolTipService.ToolTip="Dashboard">
+                <StackPanel>
+                    <TextBlock Text="{Binding ClockText}" FontSize="12" FontWeight="SemiBold"
+                               HorizontalAlignment="Right" Foreground="{Binding Theme.OnSurface}" />
+                    <TextBlock Text="{Binding DateText}" FontSize="9"
+                               HorizontalAlignment="Right" Foreground="{Binding Theme.OnSurfaceVariant}" />
+                </StackPanel>
+            </Button>
+
+            <Button Width="28" Height="28" Padding="0" BorderThickness="0" CornerRadius="9"
+                    Background="Transparent" ToolTipService.ToolTip="Session"
+                    Command="{Binding ToggleSessionCommand}">
+                <FontIcon Glyph="&#xE7E8;" FontSize="13" Foreground="{Binding Theme.OnSurfaceVariant}" />
+            </Button>
+        </StackPanel>
+    </Grid>
+</Window>

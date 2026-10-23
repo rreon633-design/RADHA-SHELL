@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="Radha.App.Views.OsdWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Border Background="{Binding Theme.SurfaceGlassStrong}" BorderBrush="{Binding Theme.OutlineVariant}"
+            BorderThickness="1" CornerRadius="18" Padding="12,10">
+        <Grid ColumnSpacing="10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Border Width="34" Height="34" CornerRadius="11" Background="{Binding Theme.PrimaryContainer}">
+                <FontIcon Glyph="&#xE767;" FontSize="16" Foreground="{Binding Theme.OnPrimaryContainer}" />
+            </Border>
+            <StackPanel Grid.Column="1" Spacing="5" VerticalAlignment="Center">
+                <Grid>
+                    <TextBlock Text="{Binding OsdLabel}" FontSize="10.5" FontWeight="SemiBold"
+                               Foreground="{Binding Theme.OnSurface}" />
+                    <TextBlock Text="{Binding OsdValue}" FontSize="9.5" HorizontalAlignment="Right"
+                               Foreground="{Binding Theme.OnSurfaceVariant}" />
+                </Grid>
+                <ProgressBar Value="{Binding OsdValue}" Height="4" CornerRadius="2"
+                             Foreground="{Binding Theme.Primary}"
+                             Background="{Binding Theme.SurfaceContainerHighest}" />
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

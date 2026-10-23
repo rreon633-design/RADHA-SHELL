@@ -1,0 +1,111 @@
+{
+  "appearance": {
+    "font": "Segoe UI Variable Display",
+    "monoFont": "Cascadia Code",
+    "scale": 1.0,
+    "fontScale": 1.0,
+    "roundingScale": 1.0,
+    "animationScale": 1.0,
+    "mode": "auto",
+    "schemeVariant": "tonalSpot",
+    "transparency": true,
+    "blurRadius": 30,
+    "useSystemAccent": false
+  },
+  "bar": {
+    "position": "top",
+    "height": 42,
+    "left": ["logo", "workspaces", "activeWindow"],
+    "center": ["media"],
+    "right": ["tray", "battery", "clock", "power"],
+    "showTray": true,
+    "autoHide": false,
+    "hoverToReveal": true,
+    "workspacesDisplay": "dots",
+    "workspaceCount": 5,
+    "showClockSeconds": false,
+    "clockFormat": "24h",
+    "trayModules": ["network", "bluetooth", "volume", "battery"]
+  },
+  "dashboard": {
+    "openOnHover": true,
+    "hoverDelayMs": 180,
+    "defaultTab": "overview",
+    "showWeather": true,
+    "showUptime": true,
+    "performanceGraphs": ["cpu", "gpu", "memory", "network", "storage", "battery"],
+    "graphHistorySeconds": 60
+  },
+  "launcher": {
+    "fuzzy": true,
+    "vimKeys": true,
+    "maxResults": 12,
+    "showFavourites": true,
+    "liveCalculator": true,
+    "actionPrefix": ">",
+    "specialPrefix": "@",
+    "hiddenApps": [],
+    "favourites": []
+  },
+  "notifications": {
+    "listenSystemToasts": true,
+    "doNotDisturb": false,
+    "timeoutSeconds": 6,
+    "maxVisible": 3,
+    "groupByApp": true,
+    "showActions": true
+  },
+  "osd": {
+    "enabled": true,
+    "timeoutMs": 1600,
+    "onVolume": true,
+    "onBrightness": true,
+    "onMic": true,
+    "position": "bottom"
+  },
+  "session": {
+    "confirmPowerActions": true,
+    "actions": ["logout", "suspend", "reboot", "shutdown"],
+    "showUptime": true
+  },
+  "controlCenter": {
+    "tiles": ["wifi", "bluetooth", "dnd", "nightLight", "darkMode", "screenRecord", "airplane", "project", "nearbyShare", "energySaver", "accessibility", "rotation"],
+    "sliders": ["volume", "brightness", "mic"],
+    "showThemeCard": true,
+    "showMediaCard": true
+  },
+  "services": {
+    "weather": {
+      "provider": "open-meteo",
+      "location": "",
+      "latitude": null,
+      "longitude": null,
+      "units": "metric",
+      "refreshMinutes": 20,
+      "apiKey": ""
+    },
+    "media": {
+      "enableVisualizer": true,
+      "enableLyrics": true,
+      "lyricsProvider": "lrclib",
+      "ignoredPlayers": []
+    },
+    "sensors": { "readCpu": true, "readGpu": true, "readTemperatures": true, "readStorage": true },
+    "audio": { "preferredOutputDevice": null, "visualizerFftSize": 2048, "visualizerBars": 48 },
+    "pollIntervalMs": 1000
+  },
+  "wallpaper": {
+    "mode": "static",
+    "path": "",
+    "fit": "fill",
+    "dim": 0.0,
+    "blur": 0.0,
+    "rotation": { "enabled": false, "intervalMinutes": 30, "shuffle": true }
+  },
+  "paths": {
+    "wallpapers": "C:\\Users\\<you>\\Pictures\\Wallpapers",
+    "cache": "",
+    "config": "",
+    "logs": ""
+  }
+}

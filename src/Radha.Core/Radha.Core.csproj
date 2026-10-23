@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Platform-neutral shell brain: theming, config, IPC contracts, service interfaces.
+       Targets net9.0 so it builds and unit-tests on any OS; the WinUI 3 presentation
+       project (Radha.App) consumes it on Windows. -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>Radha.Core</RootNamespace>
+    <AssemblyName>Radha.Core</AssemblyName>
+  </PropertyGroup>
+
+</Project>

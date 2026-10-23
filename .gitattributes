@@ -1,0 +1,18 @@
+* text=auto eol=lf
+
+*.ps1   text eol=crlf
+*.cmd   text eol=crlf
+*.bat   text eol=crlf
+
+*.png   binary
+*.jpg   binary
+*.ico   binary
+*.bmp   binary
+*.cso   binary
+*.dll   binary
+*.exe   binary
+
+*.sln           text eol=crlf
+*.csproj        text eol=crlf
+*.vcxproj       text eol=crlf
+*.hlsl          text eol=lf
