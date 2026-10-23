@@ -344,7 +344,7 @@ public sealed class IpcServer : IAsyncDisposable
     }
 }
 
-/// <summary>Thin client used by <c>radha.exe</c> and by tests.</summary>
+/// <summary>Thin client used by tests and by tooling that speaks the pipe protocol.</summary>
 public sealed class IpcClient : IAsyncDisposable
 {
     private readonly string _endpoint;

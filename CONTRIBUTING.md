@@ -19,7 +19,7 @@ read this before opening a PR.
 ```bash
 dotnet build src/Radha.Tests/Radha.Tests.csproj -c Release
 dotnet run   --project src/Radha.Tests -c Release           # expect: 235 passed, 0 failed
-dotnet run   --project src/Radha.Cli   -c Release -- bench --gate
+dotnet run   --project src/Radha.Tests -c Release -- bench --gate
 ```
 
 On Windows, additionally:
