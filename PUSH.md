@@ -41,6 +41,20 @@ Then watch the pipeline:
 gh run watch            # or: open https://github.com/rreon633-design/RADHA-SHELL/actions
 ```
 
+## ⚠️ Deploy-key pushes do not trigger workflows
+
+GitHub does not start workflow runs for pushes authenticated with a **deploy key**. The code lands,
+but the pipeline stays idle. Three ways to get CI running:
+
+| Option | Steps |
+|---|---|
+| **A. One click (fastest)** | Actions → *ci* → **Run workflow** → branch `main` → **Run workflow** |
+| **B. Push a commit yourself** | any push from your account (web editor or `git push`) triggers `ci` automatically |
+| **C. Enable write on the token** | set Contents → *Read and write* on the PAT, then re-push (PAT pushes do trigger workflows) |
+
+Verify: `gh run list -R rreon633-design/RADHA-SHELL` or
+<https://github.com/rreon633-design/RADHA-SHELL/actions>
+
 ## Expected first run
 
 `core`, `invariants`, `security`, `performance` and `docs` should go green immediately
