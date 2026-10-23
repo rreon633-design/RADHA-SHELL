@@ -4,6 +4,14 @@ All notable changes to RADHA SHELL are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning is
 [SemVer](https://semver.org/).
 
+## Unreleased — one executable
+
+- Releases now ship **`RadhaShell.exe`** — a single self-contained file (no .NET, no Windows App SDK
+  redistributable, no unzip). It is ~310 MB because the runtime and the Windows App SDK are inside;
+  that is the price of a download that Just Works on a clean machine.
+- `--selftest` runs headless checks and is the release gate: the published binary is executed on a
+  Windows runner and the release is only created if it exits 0.
+
 ## Unreleased — crashes you can diagnose
 
 - Unhandled exceptions now write `logs/crash-<timestamp>-<type>.log`: version, runtime, OS, the

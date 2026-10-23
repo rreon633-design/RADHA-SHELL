@@ -183,7 +183,7 @@ the bundle, and WinRT content is unpacked to `%TEMP%\.net\RadhaShell\…` on fir
 what `IncludeAllContentForSelfExtract` buys — WinRT activation resolves file paths, not bundle
 offsets).
 
-Because that is a ~200 MB self-extracting binary, it is **not** the default for local iteration.
+Because that is a ~310 MB self-extracting binary (the .NET runtime plus the whole Windows App SDK), it is **not** the default for local iteration.
 Use it only when you are building something to hand to someone.
 
 ### Verifying a build without a desktop
