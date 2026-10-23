@@ -180,35 +180,66 @@ jobs:
       # parse the resource index, create the bar window and report back. A windowless WinExe is
       # indistinguishable from a crash, so nothing ships until a window exists.
       - name: Smoke-test a real window
+        id: smoke
         shell: pwsh
         run: |
           $exe = (Resolve-Path publish/exe/RadhaShell.exe).Path
           $out = Join-Path $env:RUNNER_TEMP 'smoke.json'
           Write-Host "starting $exe --smoke"
           $proc = Start-Process -FilePath $exe -ArgumentList '--smoke', '--out', "`"$out`"", '--timeout', '120' -PassThru
-          if (-not $proc.WaitForExit(180000)) {
-            Stop-Process -Id $proc.Id -Force
-            Write-Host '::error::the shell started but never produced a window within 180s'
+          $exited = $proc.WaitForExit(180000)
+          if (-not $exited) { Stop-Process -Id $proc.Id -Force }
+          $code = if ($exited) { $proc.ExitCode } else { -1 }
+          Write-Host "smoke exited $code (exited=$exited)"
+          "SMOKE_CODE=$code" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "SMOKE_EXITED=$exited" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      # Everything that can explain a windowless launch, in one place, whether it passed or not.
+      # The step summary is the only channel that survives to a reader without a login.
+      - name: Collect launch diagnostics
+        if: always()
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:GITHUB_WORKSPACE 'diagnostics'
+          New-Item -ItemType Directory -Path $dir -Force | Out-Null
+          $summary = @("# RadhaShell launch diagnostics", '', "smoke exit code: $env:SMOKE_CODE (exited: $env:SMOKE_EXITED)", '')
+
+          foreach ($name in @('smoke.json')) {
+            $src = Join-Path $env:RUNNER_TEMP $name
+            if (Test-Path $src) { Copy-Item $src $dir; $summary += @("## $name", '```json', (Get-Content $src -Raw), '```') }
+            else { $summary += "## $name — not produced" }
           }
-          $code = $proc.ExitCode
-          Write-Host "smoke exited $code"
-          if (Test-Path $out) { Get-Content $out }
-          $log = Join-Path $env:APPDATA 'Radha\logs\startup.log'
-          if (Test-Path $log) { Write-Host '--- startup.log ---'; Get-Content $log -Tail 40 }
-          Get-ChildItem (Join-Path $env:APPDATA 'Radha\logs') -ErrorAction SilentlyContinue |
-            ForEach-Object { Write-Host '::group::' $_.Name; Get-Content $_.FullName; Write-Host '::endgroup::' }
-          if (-not (Test-Path $out)) { Write-Host '::error::the shell produced no smoke report: it exited before the window existed'; exit 1 }
-          if ($code -ne 0) { Write-Host '::error::the shell could not open a window'; exit 1 }
+
+          $logs = Join-Path $env:APPDATA 'Radha\logs'
+          if (Test-Path $logs) {
+            Get-ChildItem $logs -File | ForEach-Object {
+              Copy-Item $_.FullName $dir
+              $summary += @("## $($_.Name)", '```', (Get-Content $_.FullName -Raw), '```')
+            }
+          } else { $summary += '## no %APPDATA%\Radha\logs directory was created' }
+
+          # --diagnose is headless, so it always answers even when the window cannot exist.
+          $exe = (Resolve-Path publish/exe/RadhaShell.exe).Path
+          $diag = Join-Path $env:RUNNER_TEMP 'diagnose.txt'
+          $p = Start-Process -FilePath $exe -ArgumentList '--diagnose', '--out', "`"$diag`"" -PassThru
+          $p.WaitForExit(60000) | Out-Null
+          if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
+          if (Test-Path $diag) { Copy-Item $diag $dir; $summary += @('## --diagnose', '```', (Get-Content $diag -Raw), '```') }
+
+          $summary += @('## session', '```', "user: $env:USERNAME", "session: $((Get-Process -Id $PID).SessionId)", "os: $((Get-CimInstance Win32_OperatingSystem).Caption)", '```')
+          $summary -join "`n" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+          if ($env:SMOKE_CODE -ne '0') {
+            Write-Host "::error::the shell could not open a window (exit $env:SMOKE_CODE); see the job summary"
+            exit 1
+          }
 
       - name: Upload launch diagnostics
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: launch-diagnostics
-          path: |
-            ${{ runner.temp }}/*.json
-            ${{ runner.temp }}/*.txt
-            ${{ env.APPDATA }}/Radha/logs
+          path: diagnostics
           if-no-files-found: ignore
           retention-days: 7
 
