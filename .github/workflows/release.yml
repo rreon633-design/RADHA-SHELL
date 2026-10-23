@@ -49,7 +49,9 @@ jobs:
       github.event.workflow_run.conclusion == 'success'
     env:
       # tag push → the tag name; auto-chain → v0.0.0-dev.<ci run number>; manual → the input
-      VERSION: >-
+      # NB: must not be called VERSION — MSBuild maps env vars to properties and the
+      # 'Version' property rejects a leading 'v' ("'v0.0.0-dev.9' is not a valid version string").
+      RELEASE_VERSION: >-
         ${{
           github.event_name == 'push' && github.ref_name ||
           github.event_name == 'workflow_run' && format('v0.0.0-dev.{0}', github.event.workflow_run.run_number) ||
@@ -153,14 +155,14 @@ jobs:
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          name: RADHA SHELL ${{ env.VERSION }}
-          tag_name: ${{ env.VERSION }}
+          name: RADHA SHELL ${{ env.RELEASE_VERSION }}
+          tag_name: ${{ env.RELEASE_VERSION }}
           files: RadhaShell-win-x64.zip
           draft: false
-          prerelease: ${{ contains(env.VERSION, '-dev') }}
+          prerelease: ${{ contains(env.RELEASE_VERSION, '-dev') }}
           generate_release_notes: true
           body: |
-            ## RADHA SHELL ${{ env.VERSION }}
+            ## RADHA SHELL ${{ env.RELEASE_VERSION }}
 
             Native Windows shell: WinUI 3 · Composition · Win2D · HLSL · C++/WinRT.
             **No HTML/CSS/JS.**
