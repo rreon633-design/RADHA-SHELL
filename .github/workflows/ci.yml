@@ -124,7 +124,7 @@ jobs:
           files = (glob.glob("src/**/*.xaml", recursive=True)
                    + glob.glob("src/**/*.csproj", recursive=True)
                    + glob.glob("src/**/*.props", recursive=True)
-                   + glob.glob("src/**/*.manifest", recursive=True))
+                   + glob.glob("src/**/*.manifest", recursive=True) + glob.glob("src/**/*.appxmanifest", recursive=True))
           bad = []
           for f in files:
               try:
@@ -477,7 +477,7 @@ jobs:
             'RadhaHotkeyRegister','RadhaHotkeyUnregister','RadhaHotkeySetPipeEndpoint',
             'RadhaWorkspaceBuild','RadhaWorkspaceBackend','RadhaWorkspaceCount',
             'RadhaWorkspaceCurrent','RadhaWorkspaceSwitch','RadhaWorkspaceMoveActiveWindow')
-          $missing = $expected | Where-Object { $exports -notmatch "\b$_\b" }
+          $missing = $expected | Where-Object { -not ($exports -match "\b$_\b") }
           if ($missing) {
             $missing | ForEach-Object { Write-Host "::error::missing export $_" }
             throw "$($missing.Count) export(s) missing"

@@ -37,6 +37,9 @@ public static class Program
         Console.WriteLine("\n--- performance ---");
         HardeningTests.RunPerformance(Check);
 
+        Console.WriteLine("\n--- platform projections ---");
+        PlatformTests.Run(Check);
+
         Console.WriteLine("\n--- feature hardening ---");
         HardeningTests.RunFeatures(Check);
 

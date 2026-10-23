@@ -1,5 +1,8 @@
 using Radha.Core.Services;
+using Windows.Devices.Enumeration;
 using Windows.Devices.Radios;
+using Windows.Networking;
+using WinBt = Windows.Devices.Bluetooth.BluetoothDevice;
 using Windows.Networking.Connectivity;
 
 namespace Radha.App.Services.Win;
@@ -88,7 +91,53 @@ public sealed class BluetoothService : IBluetoothService
     public IReadOnlyList<BluetoothDevice> Devices => _devices;
     public event EventHandler? Changed;
 
-    public BluetoothService() { _ = InitializeAsync(); }
+    /// <summary>Paired devices, refreshed whenever the radio or the paired list changes.</summary>
+    private readonly Dictionary<string, WinBt> _linked = new(StringComparer.OrdinalIgnoreCase);
+
+    public BluetoothService()
+    {
+        _ = InitializeAsync();
+    }
+
+    /// <summary>
+    /// Re-reads the paired-device list. <c>GetDeviceSelectorFromPairingState(true)</c> is the
+    /// documented selector for paired devices and needs no capability in a desktop process.
+    /// </summary>
+    public async Task RefreshDevicesAsync()
+    {
+        try
+        {
+            var infos = await DeviceInformation.FindAllAsync(WinBt.GetDeviceSelectorFromPairingState(true));
+            var found = new List<BluetoothDevice>();
+
+            foreach (var info in infos)
+            {
+                try
+                {
+                    var device = await WinBt.FromIdAsync(info.Id);
+                    if (device is null) continue;
+
+                    found.Add(new BluetoothDevice(
+                        Id: device.DeviceId,
+                        Name: string.IsNullOrWhiteSpace(device.Name) ? info.Name : device.Name,
+                        Connected: device.ConnectionStatus == Windows.Devices.Bluetooth.BluetoothConnectionStatus.Connected,
+                        BatteryPercent: null,
+                        IconHint: device.BluetoothAddress != 0 ? "bluetooth" : null));
+
+                    _linked[device.DeviceId] = device;
+                }
+                catch { /* device vanished between enumeration and open */ }
+            }
+
+            var changed = !found.Select(d => (d.Id, d.Connected, d.Name))
+                                .SequenceEqual(_devices.Select(d => (d.Id, d.Connected, d.Name)));
+            _devices.Clear();
+            _devices.AddRange(found);
+
+            if (changed) Ui.Post(() => Changed?.Invoke(this, EventArgs.Empty));
+        }
+        catch { /* no radio / no permission: the list stays empty, the toggle still works */ }
+    }
 
     private async Task InitializeAsync()
     {
@@ -114,6 +163,29 @@ public sealed class BluetoothService : IBluetoothService
         return await _radio.SetStateAsync(target) == RadioAccessStatus.Allowed;
     }
 
-    public Task ConnectAsync(string deviceId) => Task.CompletedTask;
-    public Task DisconnectAsync(string deviceId) => Task.CompletedTask;
+    public async Task ConnectAsync(string deviceId)
+    {
+        // Opening the device object is what makes Windows establish the link; for classic devices the
+        // OS owns the connection and this simply refreshes the state.
+        try
+        {
+            if (!_linked.TryGetValue(deviceId, out var device))
+            {
+                device = await WinBt.FromIdAsync(deviceId);
+                if (device is null) return;
+                _linked[deviceId] = device;
+            }
+            _ = device.ConnectionStatus;
+        }
+        catch { }
+        await RefreshDevicesAsync();
+    }
+
+    public async Task DisconnectAsync(string deviceId)
+    {
+        // Windows has no "disconnect this paired device" API; disposing the cached object drops the
+        // link we hold, and the radio toggle remains the way to sever everything.
+        if (_linked.Remove(deviceId, out var device)) device.Dispose();
+        await RefreshDevicesAsync();
+    }
 }

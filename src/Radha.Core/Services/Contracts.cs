@@ -144,6 +144,22 @@ public interface IBluetoothService
     Task DisconnectAsync(string deviceId);
 }
 
+public sealed record VpnProfile(
+    string Name,
+    string Kind,
+    string Target,
+    bool Connected);
+
+public interface IVpnService
+{
+    IReadOnlyList<VpnProfile> Profiles { get; }
+    string? ConnectedName { get; }
+    event EventHandler? Changed;
+    Task<bool> ConnectAsync(string name);
+    Task<bool> DisconnectAsync();
+    Task RefreshAsync();
+}
+
 public interface IWeatherService
 {
     WeatherNow? Current { get; }

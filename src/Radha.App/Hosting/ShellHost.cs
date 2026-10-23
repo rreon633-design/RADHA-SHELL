@@ -35,6 +35,8 @@ public sealed class ShellHost : IAsyncDisposable
     private readonly ISystemMonitorService _system;
     private readonly IWeatherService _weather;
     private readonly IBluetoothService _bluetooth;
+    private readonly IVpnService _vpn;
+    private readonly ToastMirrorService _toastMirror;
     private readonly IWorkspaceService _workspaces;
     private readonly IpcServer _ipc;
     private readonly string _auditLogPath;
@@ -61,6 +63,7 @@ public sealed class ShellHost : IAsyncDisposable
         services.AddSingleton<IWeatherService, WeatherService>();
         services.AddSingleton<IWallpaperService, WallpaperService>();
         services.AddSingleton<INotificationService, NotificationStore>();
+        services.AddSingleton<IVpnService, VpnService>();
         services.AddSingleton<IWorkspaceService>(_ => new WorkspaceService(_config.Bar.WorkspaceCount));
         services.AddSingleton<IDisplayService, DisplayService>();
         _services = services.BuildServiceProvider();
@@ -73,6 +76,12 @@ public sealed class ShellHost : IAsyncDisposable
         _system = _services.GetRequiredService<ISystemMonitorService>();
         _weather = _services.GetRequiredService<IWeatherService>();
         _bluetooth = _services.GetRequiredService<IBluetoothService>();
+        _vpn = _services.GetRequiredService<IVpnService>();
+
+        // Toast mirroring needs package identity + a restricted capability; when unavailable it
+        // reports why and the store keeps working for shell events. Never fatal.
+        _toastMirror = new ToastMirrorService(_notifications);
+        _ = _toastMirror.StartAsync();
         _workspaces = _services.GetRequiredService<IWorkspaceService>();
 
         if (_theme is ThemeService themeService) themeService.Initialize(_config);

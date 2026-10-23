@@ -38,11 +38,28 @@ on a desktop session.
 
 ## 19.3 System toast mirroring
 
-**Problem:** `UserNotificationListener` requires packaged identity and the
+**Problem:** `UserNotificationListener` requires packaged identity and the restricted
 `userNotificationListener` capability; an unpackaged Win32 app cannot request it reliably.
 
-**Decision:** the notification centre works today for shell-generated notifications and for
-anything pushed over IPC; system toasts are documented as ⬜, not faked.
+**Decision:** implement it properly and be explicit about when it applies. `Package.appxmanifest`
+declares the identity, `runFullTrust` and `userNotificationListener`; the packaged build is opt-in
+(`-p:RadhaPackaged=true`) so the default unpackaged build is unchanged. `ToastMirrorService` asks for
+access once, mirrors every toast into the store through the unit-tested `ToastMirror` projection, and
+on an unpackaged run reports *why* it is off (`UnavailableReason`) instead of silently doing nothing.
+Restricted capabilities need Partner Center approval before Store distribution — noted in the manifest.
+
+## 19.4 VPN and Bluetooth
+
+**Problem:** `Windows.Networking.Vpn` needs the restricted `networkingVpnProvider` capability, and
+Bluetooth APIs are capability-gated for packaged apps.
+
+**Decision:** use APIs that work for a desktop process. VPN goes through the documented RAS API
+(`RasEnumEntriesW` / `RasDialW` / `RasHangUp`) — real Windows VPN profiles, no capability. Bluetooth
+uses `DeviceInformation.FindAllAsync(BluetoothDevice.GetDeviceSelectorFromPairingState(true))` for the
+paired-device list plus `Radio.SetStateAsync` for the adapter toggle. The projection rules (dedupe,
+ordering, kind inference) live in `Radha.Core.Services.RasPhonebook` and are unit-tested on Linux;
+limitations (no per-desktop window counts, no forced classic-Bluetooth connect) are documented rather
+than papered over.
 
 ## 19.4 App-bar docking correctness
 

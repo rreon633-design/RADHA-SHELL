@@ -30,8 +30,8 @@ described. "Written but not verified" is called out explicitly in the README sta
 - [x] Virtual desktops: `IVirtualDesktopManagerInternal` with version dispatch, behind the
       existing `IWorkspaceService` contract
 - [ ] Global hotkeys shipped with the app (auto-load `RadhaNative.dll`)
-- [ ] System toast mirroring (MSIX identity + `UserNotificationListener`)
-- [ ] Bluetooth device enumeration, VPN profiles
+- [x] System toast mirroring (MSIX identity + `UserNotificationListener`)
+- [x] Bluetooth device enumeration, VPN profiles
 - [ ] Lyrics provider with cached LRCLIB results
 - [ ] Wallpaper picker UI with per-image palette preview and rotation timer
 
