@@ -43,6 +43,7 @@ public static class FeatureTests
         LaunchGuardTests(check);
         WallpaperTests(check);
         PowerAndConfirmTests(check);
+        CrashReportTests(check);
     }
 
     // ---------------- design tokens ----------------
@@ -803,5 +804,57 @@ public static class FeatureTests
         var threw = false;
         try { new ConfirmGuard(TimeSpan.Zero); } catch (ArgumentOutOfRangeException) { threw = true; }
         check("confirm: zero window rejected", threw);
+    }
+
+    // ---------------- crash reports ----------------
+
+    private static void CrashReportTests(Action<string, bool> check)
+    {
+        var env = new Dictionary<string, string?>
+        {
+            ["version"] = "0.1.0",
+            ["runtime"] = "9.0.0",
+            ["os"] = "Windows 11"
+        };
+
+        Exception Build()
+        {
+            try { throw new InvalidOperationException("outer", new IOException("inner")); }
+            catch (Exception ex) { return ex; }
+        }
+
+        var text = CrashReport.Format(Build(), env, "clicked: Wallpaper tab");
+        check("crash: header", text.Contains("RADHA SHELL — crash report", StringComparison.Ordinal));
+        check("crash: outer type", text.Contains("System.InvalidOperationException", StringComparison.Ordinal));
+        check("crash: outer message", text.Contains("outer", StringComparison.Ordinal));
+        check("crash: inner exception", text.Contains("inner", StringComparison.Ordinal));
+        check("crash: context", text.Contains("clicked: Wallpaper tab", StringComparison.Ordinal));
+        check("crash: environment", text.Contains("runtime", StringComparison.Ordinal) && text.Contains("9.0.0", StringComparison.Ordinal));
+        check("crash: no exception object still formats", CrashReport.Format(null, env).Contains("no exception object", StringComparison.Ordinal));
+
+        var leaky = new Exception("request failed for key sk-example-not-a-real-key-000000");
+        var redacted = CrashReport.Format(leaky, env);
+        check("crash: secrets redacted", !redacted.Contains("sk-example-not-a-real-key-000000", StringComparison.Ordinal));
+
+        var name = CrashReport.FileName(new InvalidOperationException(), new DateTimeOffset(2026, 5, 4, 3, 2, 1, TimeSpan.Zero));
+        check("crash: filename carries type", name.Contains("InvalidOperationException", StringComparison.Ordinal) && name.EndsWith(".log"));
+        check("crash: filename is sortable", name.StartsWith("crash-20260504-030201", StringComparison.Ordinal));
+        check("crash: unknown exception still names a file", CrashReport.FileName(null, DateTimeOffset.Now).Contains("Unknown", StringComparison.Ordinal));
+
+        var dir = Path.Combine(Path.GetTempPath(), "radha-crash-" + Guid.NewGuid().ToString("N")[..8]);
+        try
+        {
+            var path = CrashReport.Write(dir, Build(), env, "boot");
+            check("crash: written to disk", path is not null && File.Exists(path));
+            check("crash: written file has the report", path is not null && File.ReadAllText(path).Contains("outer", StringComparison.Ordinal));
+            check("crash: second write is a separate file",
+                CrashReport.Write(dir, new ArgumentException("x"), env) is { } second &&
+                Path.GetDirectoryName(second) is { } folder &&
+                Directory.GetFiles(folder).Length >= 2);
+        }
+        finally
+        {
+            try { Directory.Delete(dir, true); } catch { }
+        }
     }
 }

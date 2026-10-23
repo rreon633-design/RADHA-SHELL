@@ -4,6 +4,12 @@ All notable changes to RADHA SHELL are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning is
 [SemVer](https://semver.org/).
 
+## Unreleased — crashes you can diagnose
+
+- Unhandled exceptions now write `logs/crash-<timestamp>-<type>.log`: version, runtime, OS, the
+  exception chain and its stacks, passed through the secrets redactor. The session still survives —
+  the report exists so the next bug report has something in it.
+
 ## Unreleased — power modes, safe session actions, cheaper telemetry
 
 - `radha system power [balanced|saver|performance]` drives the Windows power overlay; the shell

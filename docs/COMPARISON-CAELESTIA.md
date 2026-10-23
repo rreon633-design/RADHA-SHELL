@@ -95,7 +95,7 @@ Legend: **✅ parity** · **⚠️ partial** · **❌ not implemented** · **—
 | Global shortcuts | ✅ | native sink → dedicated pipe → `CommandCatalog` validation |
 | i18n (translations, plural rules, units) | ⚠️ | translator + CLDR plurals + clock/temperature/size units; UI strings not yet migrated |
 | Installer / package (AUR, Nix) | ⚠️ | zip + optional MSIX; no winget/installer |
-| Crash reports / issue templates | ⚠️ | redacted diagnostics bundle (config, logs, environment); no automatic crash handler |
+| Crash reports / issue templates | ✅ | dispatcher, AppDomain and task exceptions are written to `logs/crash-*.log` through the same redactor the bundle uses; issue template asks for it |
 | Release automation | ✅ | CI + auto-CD release on every green `main` |
 
 **Score after the third batch:** of ~55 comparable surfaces and services, **36 are at parity, 11
