@@ -11,8 +11,7 @@
 | GPU | DX11-class (Composition) | any modern iGPU/dGPU |
 | Disk | 180 MB self-contained | — |
 
-Linux/macOS can build and test `Radha.Core`, `Radha.Cli` and `Radha.Tests` — that is how CI
-verifies the engine.
+Linux/macOS can build and test `Radha.Core` and `Radha.Tests` — that is how CI verifies the engine.
 
 ## 13.2 Get the source
 
@@ -23,12 +22,11 @@ cd RADHA-SHELL
 
 ## 13.3 Build
 
-### Core, CLI and tests (any OS)
+### Core and tests (any OS)
 
 ```bash
 dotnet build src/Radha.Tests/Radha.Tests.csproj -c Release
-dotnet run   --project src/Radha.Tests -c Release      # 235 assertions
-dotnet run   --project src/Radha.Cli   -c Release -- help
+dotnet run   --project src/Radha.Tests -c Release      # 542 assertions
 ```
 
 ### The shell (Windows)
@@ -62,14 +60,10 @@ dxc -T ps_6_0 -E main src\Radha.Shaders\Blur.hlsl -Fo assets\Blur.cso
 ## 13.4 First run
 
 1. `RadhaShell.exe` → the bar appears at the top of the primary display.
-2. Add `radha.exe` to `PATH` (it ships in the same release archive).
-3. Try:
-   ```powershell
-   radha dashboard toggle
-   radha controlcenter toggle
-   radha theme variant vibrant
-   radha wallpaper set "C:\Users\you\Pictures\Wallpapers\aurora.png"
-   ```
+2. Press **Ctrl+Alt+D** (dashboard), **Ctrl+Alt+Space** (launcher) or **Ctrl+Alt+C** (control centre),
+   or right-click the tray icon.
+3. Right-click the tray icon → **Settings** for every option: appearance, motion, bar, notifications,
+   launcher, OSD, services, the desktop layer, and power mode.
 
 If the bar does not appear, see [BUILD.md](BUILD.md#typical-first-build-issues).
 
@@ -86,8 +80,8 @@ Start from the example:
 
 ```powershell
 copy examples\shell.json "$env:APPDATA\Radha\shell.json"
-radha config set appearance.schemeVariant vibrant
-radha config reload
+
+# …then either edit that file, or use Settings in the tray menu — the shell reloads on save.
 ```
 
 A corrupt file is moved to `shell.json.broken` and defaults are used — the shell always starts.
@@ -110,7 +104,7 @@ No registry keys, services or drivers are installed.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `radha` says "not running" | daemon not started | run `RadhaShell.exe` |
+| Nothing appears | the shell is not running | run `RadhaShell.exe` |
 | `windows` CI job red | XAML/SDK drift | read the job log; the core still works |
 | Bar overlaps maximised windows | app bar not registered | ensure `RadhaNative.dll` is beside the exe |
 | No transparency | battery saver / transparency effects off | Settings → Personalisation → Colours |

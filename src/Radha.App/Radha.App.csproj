@@ -38,7 +38,9 @@
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <!-- WinRT activation resolves paths, so content is extracted rather than read from the bundle. -->
     <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
-    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
+    <!-- Halves the download. The cost is decompression into %TEMP% on first launch, which is
+         paid once per version and is far cheaper than a 300 MB download for every user. -->
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <!-- Required by Microsoft.WindowsAppSDK.SingleFile.targets: single-file needs MSIX tooling to
          generate the embedded resources.pri, and needs the undocked reg-free WinRT initialiser so
          activation does not look for an installed runtime. -->
@@ -59,7 +61,6 @@
     <PackageReference Include="Microsoft.Graphics.Win2D" Version="1.3.2" />
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.4" />
-    <PackageReference Include="System.Reactive" Version="6.0.1" />
   </ItemGroup>
 
   <ItemGroup>

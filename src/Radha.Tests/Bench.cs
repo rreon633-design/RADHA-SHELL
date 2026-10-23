@@ -6,10 +6,11 @@ using Radha.Core.Performance;
 using Radha.Core.Search;
 using Radha.Core.Theming;
 
-namespace Radha.Cli;
+namespace Radha.Tests;
 
 /// <summary>
-/// <c>radha bench</c> — micro-benchmarks that gate performance regressions in CI.
+/// Micro-benchmarks that gate performance regressions in CI (<c>dotnet run --project
+/// src/Radha.Tests -- bench --gate</c>).
 /// Runs offline (no daemon): palette extraction, scheme generation, launcher ranking,
 /// config I/O and an in-process IPC loopback.
 /// </summary>

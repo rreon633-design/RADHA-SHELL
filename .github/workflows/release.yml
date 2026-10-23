@@ -159,25 +159,11 @@ jobs:
           if ($proc.ExitCode -ne 0) { Write-Host "::error::the published executable failed its self-test"; exit 1 }
           Get-Content $out
 
-      - name: Publish CLI
-        shell: pwsh
-        run: |
-          $version = $env:RELEASE_VERSION.TrimStart('v')
-          dotnet publish src/Radha.Cli/Radha.Cli.csproj `
-            -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true `
-            -p:Version=$version -o publish/cli
-          if ($LASTEXITCODE -ne 0) { throw "CLI publish failed" }
-          Copy-Item publish/cli/radha.exe publish/exe/radha.exe -Force
-          & publish/exe/radha.exe help
-          if ($LASTEXITCODE -ne 0) { throw "radha.exe does not start" }
-
       - name: Upload artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: RadhaShell-win-x64
-          path: |
-            publish/exe/RadhaShell.exe
-            publish/exe/radha.exe
+          path: publish/exe/RadhaShell.exe
           retention-days: 30
 
       - name: Attest the executable
@@ -189,7 +175,7 @@ jobs:
         shell: pwsh
         run: |
           Push-Location publish/exe
-          Get-FileHash RadhaShell.exe, radha.exe -Algorithm SHA256 |
+          Get-FileHash RadhaShell.exe -Algorithm SHA256 |
             ForEach-Object { "$($_.Hash.ToLower())  $($_.Path | Split-Path -Leaf)" } |
             Set-Content SHA256SUMS.txt -Encoding ascii
           Pop-Location
@@ -202,7 +188,6 @@ jobs:
           tag_name: ${{ env.RELEASE_VERSION }}
           files: |
             publish/exe/RadhaShell.exe
-            publish/exe/radha.exe
             publish/exe/SHA256SUMS.txt
           draft: false
           prerelease: ${{ contains(env.RELEASE_VERSION, '-dev') }}
@@ -218,9 +203,6 @@ jobs:
             **`RadhaShell.exe`** — that is the whole install. One file, self-contained: no .NET
             runtime, no Windows App SDK redistributable, nothing to unzip. Put it anywhere and run it.
 
-            `radha.exe` is optional: a command-line remote for a running shell
-            (`radha dashboard toggle`, `radha wallpaper next`, `radha config doctor`).
-
             Unsigned development build — Windows SmartScreen will ask for confirmation the first
             time (More info → Run anyway). Verify the download against `SHA256SUMS.txt`.
 
@@ -235,8 +217,9 @@ jobs:
 
             ### First run
 
-            The bar appears at the top of the primary display. Right-click the tray icon for the
-            menu. Config lives in `%APPDATA%\Radha\shell.json`; `radha config doctor` reports
-            problems in it.
+            The bar appears at the top of the primary display. Right-click the tray icon and choose
+            **Settings** — every option (appearance, density, motion, bar, notifications, launcher,
+            OSD, services, wallpaper layer, power) is in that window. The JSON in
+            `%APPDATA%\Radha\shell.json` is the same data, if you prefer to edit it.
 
             No lock screen; no Explorer replacement.

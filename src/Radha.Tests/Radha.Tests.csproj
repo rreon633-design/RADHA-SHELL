@@ -10,7 +10,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Radha.Core\Radha.Core.csproj" />
-    <ProjectReference Include="..\Radha.Cli\Radha.Cli.csproj" />
   </ItemGroup>
 
   <ItemGroup>

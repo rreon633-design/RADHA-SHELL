@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Radha.Cli;
 using Radha.Core.Config;
 using Radha.Core.Ipc;
 using Radha.Core.Modules;
@@ -16,8 +15,12 @@ public static class Program
     private static int _passed;
     private static readonly List<string> Failures = new();
 
-    public static async Task<int> Main()
+    public static async Task<int> Main(string[] args)
     {
+        // CI perf gate: dotnet run --project src/Radha.Tests -- bench --gate
+        if (args.Length > 0 && args[0] is "bench")
+            return await Bench.RunAsync(args, Console.Out, Console.Error);
+
         Console.WriteLine("RADHA SHELL — core test suite\n");
 
         TestColourMath();
@@ -28,7 +31,6 @@ public static class Program
         TestConfig();
         TestCommandCatalog();
         await TestIpcAsync();
-        TestCli();
 
         Console.WriteLine("\n--- security ---");
         HardeningTests.RunSecurity(Check);
@@ -312,50 +314,6 @@ public static class Program
         await client2.DisposeAsync();
         await server.DisposeAsync();
         Check("endpoint cleaned up on shutdown", !File.Exists(endpoint));
-    }
-
-    // ---------------- CLI ----------------
-
-    private static void TestCli()
-    {
-        var temp = Directory.CreateTempSubdirectory("radha-cli-").FullName;
-        try
-        {
-            var image = Fixture("quadrant.png");
-            var stdout = new StringWriter();
-            var stderr = new StringWriter();
-            var exit = CliApp.RunAsync(new[] { "scheme", "extract", image, "--json" }, stdout, stderr)
-                .GetAwaiter().GetResult();
-
-            Check("cli scheme extract exit 0", exit == 0);
-            var json = stdout.ToString();
-            Check("cli emits JSON palette", json.Contains("\"roles\"") && json.Contains("\"seed\""));
-            using var doc = JsonDocument.Parse(json);
-            var roles = doc.RootElement.GetProperty("roles");
-            Check("cli JSON has primary role", roles.TryGetProperty("primary", out var primary) &&
-                                                 primary.GetString()!.StartsWith('#'));
-            Check("cli JSON has 35 roles", roles.EnumerateObject().Count() == 35);
-
-            stdout = new StringWriter();
-            stderr = new StringWriter();
-            exit = CliApp.RunAsync(new[] { "scheme", "extract", Path.Combine(temp, "nope.png") }, stdout, stderr)
-                .GetAwaiter().GetResult();
-            Check("cli rejects missing image", exit == 1 && stderr.ToString().Contains("no such image"));
-
-            stdout = new StringWriter();
-            stderr = new StringWriter();
-            exit = CliApp.RunAsync(new[] { "theme", "explode" }, stdout, stderr).GetAwaiter().GetResult();
-            Check("cli rejects invalid command", exit == 1 && stderr.ToString().Contains("not a valid command"));
-
-            stdout = new StringWriter();
-            stderr = new StringWriter();
-            exit = CliApp.RunAsync(new[] { "help" }, stdout, stderr).GetAwaiter().GetResult();
-            Check("cli help exit 0", exit == 0 && stdout.ToString().Contains("RADHA SHELL"));
-        }
-        finally
-        {
-            try { Directory.Delete(temp, true); } catch { }
-        }
     }
 
     // ---------------- harness ----------------

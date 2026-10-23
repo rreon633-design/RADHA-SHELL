@@ -5,7 +5,6 @@
 | Project | Linux / CI | Windows | Notes |
 |---|---|---|---|
 | `Radha.Core` | ✅ | ✅ | `net9.0`, no OS APIs |
-| `Radha.Cli` | ✅ | ✅ | produces `radha.exe` |
 | `Radha.Tests` | ✅ | ✅ | console harness, no NuGet test packages |
 | `Radha.App` (C# type-check) | ✅ | ✅ | `tools/TypeCheck` — compiles every `.cs` against the real WinUI reference assemblies |
 | `Radha.App` (XAML → runnable shell) | ❌ | ✅ | needs `XamlCompiler.exe` + MSIX; Windows-only |
@@ -166,7 +165,6 @@ Not wired into the app yet — phase 1 uses DWM acrylic/Mica.
 
 ```bash
 dotnet run --project src/Radha.Tests     # 130 assertions
-dotnet run --project src/Radha.Cli -- scheme extract sample.png --json
 ```
 
 ## Shipping one executable

@@ -4,6 +4,31 @@ All notable changes to RADHA SHELL are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning is
 [SemVer](https://semver.org/).
 
+## Unreleased — virtual desktops verified, not assumed
+
+- `RadhaNative.dll` builds clean under GCC with `-Wall -Wextra -Werror` as well as MSVC; the
+  `FARPROC` → typed-pointer cast that GCC rejects is now a size-checked `memcpy`.
+- All 16 exports are present and checked by name in CI (`dumpbin /exports`), and the smoke test
+  drives the ABI: live backend asserts every desktop is reachable by index and that returning to
+  the original one works; unsupported builds assert `count == 0`, `current == -1` and `FALSE`
+  returns rather than a crash.
+- Window moves go through the *documented* `MoveWindowToDesktop`; only enumeration and switching
+  touch the undocumented interface.
+
+## Unreleased — one app, one window for everything
+
+- **The CLI is gone.** `radha.exe` and the `Radha.Cli` project are removed. The command catalog is
+  still the single gate, driven by the tray, the global hotkeys and the launcher; the IPC pipe keeps
+  accepting the same protocol for tooling. The CI perf gate moved to the test runner
+  (`dotnet run --project src/Radha.Tests -- bench --gate`).
+- **Settings window covers every option**: appearance and accent, motion and corner rounding, bar
+  (height, tray, displays, clock, workspaces), notifications, launcher, OSD, services, the desktop
+  layer, power mode, plus config doctor / fix / diagnostics / open folder. One control per config
+  key, saved through `ConfigStore` and applied live by the watcher.
+- The executable is compressed (single-file + `EnableCompressionInSingleFile`), which roughly halves
+  the download at the cost of a one-time extraction on first launch. The unused `System.Reactive`
+  dependency is gone.
+
 ## Unreleased — one executable
 
 - Releases now ship **`RadhaShell.exe`** — a single self-contained file (no .NET, no Windows App SDK

@@ -793,10 +793,25 @@ public sealed class ShellHost : IAsyncDisposable
             _configStore,
             _theme,
             CheckUpdatesAsync,
+            ApplyPowerProfile,
             _hotkeys?.Registered.Count ?? 0,
             _hotkeys?.Failures ?? Array.Empty<string>());
         _settings.Closed += (_, _) => _settings = null;
         _settings.Activate();
+    }
+
+    /// <summary>
+    /// Applies a power overlay. Returns false when the machine refused it (no battery, or powercfg
+    /// blocked by policy) so callers do not record a value that did not take effect.
+    /// </summary>
+    public bool ApplyPowerProfile(string profile)
+    {
+        if (!PowerProfiles.TryParse(profile, out var requested)) return false;
+        if (!RunQuiet("powercfg.exe", PowerProfiles.PowercfgArguments(PowerProfiles.ToGuid(requested)))) return false;
+
+        _config.Power.Profile = PowerProfiles.ToConfigString(requested);
+        try { _configStore.SavePreservingUnknown(_config); } catch { }
+        return true;
     }
 
     /// <summary>Runs the check and returns a sentence for the UI; also stores the result.</summary>

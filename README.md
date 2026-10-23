@@ -17,7 +17,7 @@ Caelestia's shell for Hyprland.
 | Shaders | **HLSL** — blur, rounded-rect SDF morph, grain |
 | Native interop | **C++/WinRT** + Win32 (AppBar, DWM, hotkeys, virtual desktops) |
 | Logic / services | **C# / .NET 9** (`System.Text.Json`, DI, LibreHardwareMonitor, NAudio, SMTC) |
-| IPC / CLI | named pipes + length-prefixed JSON, `radha` CLI |
+| IPC | named pipes + length-prefixed JSON; one command catalog behind hotkeys, tray and GUI |
 
 ---
 
@@ -49,7 +49,7 @@ Every project is compiled here. Only one step in the whole pipeline is Windows-l
 | Area | State | Evidence |
 |---|---|---|
 | `Radha.Core` — palette engine, wallpaper decoding, config (+migrations/doctor), IPC protocol, command catalog, launcher engine, notifications, power rules, lyrics, i18n, diagnostics, security, performance | ✅ **built + tested** | **549 assertions, 0 failures**; 5 benchmark budgets green |
-| `radha` CLI — palette extraction, command surface, IPC client | ✅ **built + tested** | runs offline for `scheme extract` |
+| Settings window — appearance, motion, bar, notifications, launcher, OSD, services, desktop layer, power, config health | ✅ **compiles** | one control per config key; saved through `ConfigStore`, picked up live by the config watcher |
 | `Radha.App` — WinUI 3 bar / dashboard / launcher / control centre / notifications / OSD / session | ✅ **compiles and ships** | `xaml-audit` (0 findings, XA0–XA14) + `app-typecheck` (27 files) + **`winui` builds the shell on windows-latest**; every green `main` publishes a single self-contained **`RadhaShell.exe`** |
 | `Radha.Native` — AppBar dock, blur, global hotkeys, VD stubs | ✅ **compiled + linked** | 5 files clean under `clang++ -Werror`; `RadhaNative.dll` (PE32+ x86-64) exports all 14 symbols |
 | `Radha.Shaders` — Blur / Morph / Grain | ✅ **compiled** | 3/3 → DXIL via `dxc -T ps_6_0`; not yet wired into the app |
@@ -70,9 +70,15 @@ Every project is compiled here. Only one step in the whole pipeline is Windows-l
 
 ### What the shell does not do yet
 
-Screen capture and recording, window previews, wallpaper shader transitions, plugins, power
-profiles, a lock screen, and Bluetooth *pairing* (enumeration and connect exist). Each is listed
-with its reason in [`docs/COMPARISON-CAELESTIA.md`](docs/COMPARISON-CAELESTIA.md).
+Screen capture and recording, window previews, wallpaper shader transitions, plugins, multi-player
+media, disk/network history graphs and a lock screen (excluded by design). Each is listed with its
+reason in [`docs/COMPARISON-CAELESTIA.md`](docs/COMPARISON-CAELESTIA.md).
+
+Virtual desktops are *not* simulated: `RadhaNative.dll` resolves the shell's undocumented
+`IVirtualDesktopManagerInternal` with the vtable layout that matches the running build, and the
+shipped binary is exercised by a native smoke test on a Windows runner. Builds with no verified
+layout report "unsupported" and the bar says so instead of pretending. Details:
+[`docs/VIRTUAL-DESKTOPS.md`](docs/VIRTUAL-DESKTOPS.md).
 
 ### Comparison against caelestia-shell
 
@@ -102,22 +108,14 @@ XA13/XA14 in the audit.
 ```text
 $ dotnet run --project src/Radha.Tests
 RADHA SHELL — core test suite
-130 passed, 0 failed
+542 passed, 0 failed
 ```
 
 ```text
-$ radha wallpaper monitors
-[{"id":"\\?\DISPLAY#DELA04A5#5&2f1f8e3&0&UID4353#{...}","name":"DELA04A5 (5&2f1f8e3&0&UID4353)","isPrimary":true}]
-
-$ radha wallpaper assign '\\?\DISPLAY#DELA04A5#...#{...}' "C:\Pictures\Wallpapers\aurora.png"
-
-$ radha scheme extract wallpaper.png
-RADHA SHELL · palette from wallpaper.png (64×64)
-seed #7C5CFF   variant TonalSpot   dark
-
-  ██████  primary                #A08CFF
-  ██████  onPrimary              #320880
-  ██████  surface                #141019
+$ dotnet run --project src/Radha.Tests -- bench --gate
+palette.extract   25   p95  5.76ms  budget 120ms  PASS
+scheme.generate  500   p95  0.12ms  budget   5ms  PASS
+launcher.rank     50   p95  1.29ms  budget  40ms  PASS  · 5,000 apps
   ...
 ```
 
@@ -144,7 +142,6 @@ radha-shell/
 │  │  └─ Interop/NativeMethods.cs # Win32 surface
 │  ├─ Radha.Native/               # C++/WinRT bridge (CMake)
 │  ├─ Radha.Shaders/              # HLSL effects + build notes
-│  ├─ Radha.Cli/                  # `radha` command-line control
 │  └─ Radha.Tests/                # dependency-free test harness + image fixtures
 ├─ docs/ARCHITECTURE.md · BUILD.md · ROADMAP.md
 └─ scripts/build.ps1 · run.ps1
@@ -158,10 +155,10 @@ Every push to `main` and every pull request runs `.github/workflows/ci.yml`:
 
 | Job | Runner | Gate |
 |---|---|---|
-| `core` | ubuntu | builds Core + CLI + tests with **warnings as errors**, runs all 235 assertions, smoke-tests the palette CLI and asserts the JSON contract (35 roles, valid hex) |
+| `core` | ubuntu | builds Core + tests with **warnings as errors**, runs all 542 assertions |
 | `invariants` | ubuntu | fails if any HTML/CSS/JS/Electron/WebView2 artifact appears in `src/`, and validates every XAML / csproj / manifest / JSON file |
 | `security` | ubuntu | secret scan (PATs, keys, private-key blocks), dependency policy (`Core` must stay package-free), no tracked binaries/build output, 2 MiB file ceiling |
-| `performance` | ubuntu | runs `radha bench --gate`; fails on any p95 budget regression |
+| `performance` | ubuntu | runs `bench --gate` from the test runner; fails on any p95 budget regression |
 | `docs` | ubuntu | asserts all 24 PRD documents + policies exist, validates internal markdown links, and fails if lock-screen code appears in `src/` |
 | `winui` | windows | compiles the WinUI 3 shell (`-p:Platform=x64`) and uploads the app folder |
 | `native` | windows | compiles the C++/WinRT bridge with MSVC and checks `RadhaNative.dll` exists |
@@ -169,7 +166,7 @@ Every push to `main` and every pull request runs `.github/workflows/ci.yml`:
 | `ci-gate` | ubuntu | single required check — fails if any job above did not succeed |
 
 Tagging `v*.*.*` runs `.github/workflows/release.yml`: tests, publishes the self-contained shell,
-the CLI, the native bridge and compiled shaders, then creates a GitHub Release with
+one self-contained executable, then creates a GitHub Release with
 `RadhaShell-win-x64.zip` attached.
 
 ```bash
@@ -183,7 +180,6 @@ git tag v0.1.0 && git push origin v0.1.0
 ```bash
 dotnet build src/Radha.Tests/Radha.Tests.csproj
 dotnet run   --project src/Radha.Tests
-dotnet run   --project src/Radha.Cli -- scheme extract path/to/image.png --json
 ```
 
 ### Windows (full shell)
@@ -198,7 +194,8 @@ dotnet run   --project src/Radha.App -p:Platform=x64
 ```
 
 The bar appears as a docked app bar; the overlay window stays hidden until a panel opens.
-Start with `radha dashboard toggle`, `radha controlcenter toggle`, `radha launcher toggle`.
+Press **Ctrl+Alt+D** for the dashboard, **Ctrl+Alt+Space** for the launcher, or right-click the
+tray icon and choose **Settings**.
 
 ---
 
@@ -211,30 +208,20 @@ maintenance, problematic areas, risks, advantages, future scope, success metrics
 
 Policies: [SECURITY.md](SECURITY.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [CHANGELOG.md](CHANGELOG.md) · [LICENSE](LICENSE)
 
-## Command surface
+## Control surface
 
-The CLI and the in-app launcher share one catalog (`Radha.Core/Modules/CommandCatalog.cs`):
+There is no separate CLI binary. The shell is driven by:
 
-```
-radha bar            show | hide | toggle | reload
-radha dashboard      open | close | toggle | tab
-radha launcher       open | close | toggle | query
-radha controlcenter  open | close | toggle
-radha notifications  open | close | toggle | clear | dnd-on | dnd-off | dnd-toggle
-radha osd            volume <0-100> | brightness <0-100> | mic
-radha session        menu | logout | suspend | reboot | shutdown
-radha media          play-pause | next | previous | seek <s> | mute | status
-radha wallpaper      set <path> | next | random | list | current
-radha theme          set <#hex> | variant <v> | dark | light | toggle | status
-radha network        status | wifi-toggle | vpn-toggle
-radha bluetooth      status | toggle
-radha system         status | volume <0-100> | brightness <0-100> | uptime
-radha config         get | set <path> <value> | path | reload | monitor-override <monitor> <json>
-radha scheme extract <image> [--variant v] [--light|--dark] [--json]
-```
+| | |
+|---|---|
+| **Hotkeys** | Ctrl+Alt+Space launcher · `+D` dashboard · `+C` control centre · `+N` notifications · `+W` next wallpaper · `+Q` session menu |
+| **Tray** | left-click opens the dashboard; right-click for dashboard, control centre, launcher, notifications, next wallpaper, settings, diagnostics, quit |
+| **Settings window** | every option, grouped; saved through `ConfigStore` and applied live |
+| **IPC** | the named pipe `radha-shell` still accepts the command catalog below — for scripts and tooling that speak the protocol directly |
 
-The daemon validates every request against the same catalog — an unknown module or command is
-rejected with an error response, never executed blindly.
+The command catalog (`Radha.Core/Modules/CommandCatalog.cs`) is the single gate: an unknown module
+or command is rejected before anything executes, whether it arrives from a hotkey, the tray, the
+launcher or the pipe.
 
 ---
 
@@ -261,8 +248,8 @@ overrides live in `%APPDATA%\Radha\monitors\<display>\shell.json` and are deep-m
 }
 ```
 
-`radha config set appearance.scale 1.1` writes through reflection to the strongly typed model,
-then saves atomically (temp file + swap). A corrupt file is backed up to `shell.json.broken` and
+The Settings window writes through reflection to the strongly typed model, then saves atomically
+(temp file + swap). A corrupt file is backed up to `shell.json.broken` and
 defaults are used — the shell always starts.
 
 ---

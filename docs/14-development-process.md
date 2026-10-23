@@ -17,7 +17,7 @@
 |---|---|---|
 | Build | `dotnet build src/Radha.Tests/Radha.Tests.csproj -c Release` | any OS |
 | Tests | `dotnet run --project src/Radha.Tests -c Release` | any OS |
-| Benchmarks | `dotnet run --project src/Radha.Cli -c Release -- bench --gate` | any OS |
+| Benchmarks | `dotnet run --project src/Radha.Tests -c Release -- bench --gate` | any OS |
 | Invariants | the `invariants` CI job | any OS |
 | WinUI build | `dotnet build src/Radha.App/Radha.App.csproj -p:Platform=x64` | Windows |
 | Native build | `cmake --build build --config Release` | Windows |

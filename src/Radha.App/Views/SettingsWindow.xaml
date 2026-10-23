@@ -40,6 +40,25 @@
                                 StepFrequency="0.05" Width="320" HorizontalAlignment="Left" />
                         <Slider x:Name="BlurSlider" Header="Blur radius" Minimum="0" Maximum="64"
                                 StepFrequency="1" Width="320" HorizontalAlignment="Left" />
+                        <ToggleSwitch x:Name="TransparencySwitch" Header="Transparency (restart)"
+                                      OnContent="On" OffContent="Off" />
+                        <ToggleSwitch x:Name="SystemAccentSwitch" Header="Follow the Windows accent colour (restart)"
+                                      OnContent="On" OffContent="From wallpaper" />
+                    </StackPanel>
+                </Border>
+
+                <!-- motion + geometry -->
+                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1" CornerRadius="10" Padding="16">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Motion and geometry" FontWeight="SemiBold" />
+                        <Slider x:Name="AnimationSlider" Header="Animation speed (0 = off)" Minimum="0" Maximum="2"
+                                StepFrequency="0.05" Width="320" HorizontalAlignment="Left" />
+                        <Slider x:Name="RoundingSlider" Header="Corner rounding" Minimum="0" Maximum="2"
+                                StepFrequency="0.05" Width="320" HorizontalAlignment="Left" />
+                        <Slider x:Name="FontScaleSlider" Header="Type scale" Minimum="0.7" Maximum="1.8"
+                                StepFrequency="0.05" Width="320" HorizontalAlignment="Left" />
                     </StackPanel>
                 </Border>
 
@@ -54,6 +73,89 @@
                         <ToggleSwitch x:Name="TraySwitch" Header="Tray icon" OnContent="On" OffContent="Off" />
                         <ToggleSwitch x:Name="AllDisplaysSwitch" Header="Show on every display"
                                       OnContent="On" OffContent="Primary only" />
+                        <ToggleSwitch x:Name="SecondsSwitch" Header="Seconds in the clock" OnContent="On" OffContent="Off" />
+                        <ComboBox x:Name="ClockFormatBox" Header="Clock format" Width="200" HorizontalAlignment="Left" />
+                        <ComboBox x:Name="WorkspacesBox" Header="Workspaces shown as" Width="200" HorizontalAlignment="Left" />
+                        <Slider x:Name="WorkspaceCountSlider" Header="Workspace count" Minimum="1" Maximum="12"
+                                StepFrequency="1" Width="320" HorizontalAlignment="Left" />
+                    </StackPanel>
+                </Border>
+
+                <!-- notifications -->
+                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1" CornerRadius="10" Padding="16">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Notifications" FontWeight="SemiBold" />
+                        <ToggleSwitch x:Name="DndSwitch" Header="Do not disturb" OnContent="On" OffContent="Off" />
+                        <ToggleSwitch x:Name="MirrorSwitch" Header="Mirror Windows toasts" OnContent="On" OffContent="Off" />
+                        <ToggleSwitch x:Name="GroupSwitch" Header="Group by app" OnContent="On" OffContent="Off" />
+                        <Slider x:Name="TimeoutSlider" Header="Dismiss after (seconds)" Minimum="2" Maximum="60"
+                                StepFrequency="1" Width="320" HorizontalAlignment="Left" />
+                        <Slider x:Name="MaxVisibleSlider" Header="Visible at once" Minimum="1" Maximum="10"
+                                StepFrequency="1" Width="320" HorizontalAlignment="Left" />
+                    </StackPanel>
+                </Border>
+
+                <!-- launcher -->
+                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1" CornerRadius="10" Padding="16">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Launcher" FontWeight="SemiBold" />
+                        <ToggleSwitch x:Name="FuzzySwitch" Header="Fuzzy matching" OnContent="On" OffContent="Off" />
+                        <ToggleSwitch x:Name="VimSwitch" Header="Vim keys (Ctrl+J / Ctrl+K)" OnContent="On" OffContent="Off" />
+                        <ToggleSwitch x:Name="CalcSwitch" Header="Live calculator" OnContent="On" OffContent="Off" />
+                        <Slider x:Name="MaxResultsSlider" Header="Results shown" Minimum="3" Maximum="50"
+                                StepFrequency="1" Width="320" HorizontalAlignment="Left" />
+                    </StackPanel>
+                </Border>
+
+                <!-- osd + services -->
+                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1" CornerRadius="10" Padding="16">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="On-screen display and services" FontWeight="SemiBold" />
+                        <ToggleSwitch x:Name="OsdSwitch" Header="Show the volume and brightness overlay"
+                                      OnContent="On" OffContent="Off" />
+                        <Slider x:Name="OsdTimeoutSlider" Header="Overlay duration (ms)" Minimum="400" Maximum="6000"
+                                StepFrequency="100" Width="320" HorizontalAlignment="Left" />
+                        <Slider x:Name="WeatherSlider" Header="Weather refresh (minutes)" Minimum="5" Maximum="180"
+                                StepFrequency="5" Width="320" HorizontalAlignment="Left" />
+                        <Slider x:Name="VisualizerSlider" Header="Visualiser bars" Minimum="8" Maximum="128"
+                                StepFrequency="8" Width="320" HorizontalAlignment="Left" />
+                        <Slider x:Name="PollSlider" Header="Sensor poll interval (ms)" Minimum="250" Maximum="5000"
+                                StepFrequency="250" Width="320" HorizontalAlignment="Left" />
+                    </StackPanel>
+                </Border>
+
+                <!-- desktop layer -->
+                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1" CornerRadius="10" Padding="16">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Desktop layer" FontWeight="SemiBold" />
+                        <TextBlock Text="Wallpaper, clock and visualiser behind the desktop icons. Applies on next start."
+                                   FontSize="12" Opacity="0.7" TextWrapping="Wrap" />
+                        <ToggleSwitch x:Name="BackgroundSwitch" Header="Enable the background layer"
+                                      OnContent="On" OffContent="Off" />
+                        <ToggleSwitch x:Name="DeskClockSwitch" Header="Desktop clock" OnContent="On" OffContent="Off" />
+                        <ToggleSwitch x:Name="VisSwitch" Header="Audio visualiser" OnContent="On" OffContent="Off" />
+                        <Slider x:Name="DimSlider" Header="Dim" Minimum="0" Maximum="0.8"
+                                StepFrequency="0.05" Width="320" HorizontalAlignment="Left" />
+                        <ComboBox x:Name="FitBox" Header="Wallpaper placement" Width="200" HorizontalAlignment="Left" />
+                    </StackPanel>
+                </Border>
+
+                <!-- power -->
+                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1" CornerRadius="10" Padding="16">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Power" FontWeight="SemiBold" />
+                        <ComboBox x:Name="PowerBox" Header="Power mode" Width="240" HorizontalAlignment="Left" />
+                        <TextBlock Text="Only meaningful on a machine with a battery." FontSize="12" Opacity="0.7" />
                     </StackPanel>
                 </Border>
 
@@ -80,6 +182,7 @@
                             <Button Content="Run doctor" Click="OnRunDoctor" />
                             <Button Content="Fix" Click="OnFix" />
                             <Button Content="Diagnostics bundle" Click="OnDiagnostics" />
+                            <Button Content="Open config folder" Click="OnOpenFolder" />
                         </StackPanel>
                     </StackPanel>
                 </Border>

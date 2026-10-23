@@ -4,6 +4,7 @@
 #include <objbase.h>
 #include <winternl.h>
 
+#include <cstring>
 #include <mutex>
 
 // ---------------------------------------------------------------------------------------------
@@ -142,7 +143,13 @@ State g_state;
 int OsBuild() {
     using FnRtlGetVersion = LONG(WINAPI*)(PRTL_OSVERSIONINFOW);
     if (auto ntdll = GetModuleHandleW(L"ntdll.dll")) {
-        auto fn = reinterpret_cast<FnRtlGetVersion>(GetProcAddress(ntdll, "RtlGetVersion"));
+        // memcpy rather than a cast: GCC treats FARPROC -> typed pointer as an incompatible
+        // function-type cast (a hard error under -Werror) and the round trip is identical.
+        FnRtlGetVersion fn = nullptr;
+        if (FARPROC proc = GetProcAddress(ntdll, "RtlGetVersion")) {
+            static_assert(sizeof(fn) == sizeof(proc), "function pointer size mismatch");
+            std::memcpy(&fn, &proc, sizeof(fn));
+        }
         if (fn) {
             RTL_OSVERSIONINFOW info{};
             info.dwOSVersionInfoSize = sizeof(info);

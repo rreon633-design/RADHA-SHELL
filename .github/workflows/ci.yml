@@ -52,7 +52,7 @@ jobs:
           dotnet-version: 9.0.x
 
       - name: Restore
-        # Restoring the test project also restores Core and the CLI via ProjectReference.
+        # Restoring the test project also restores Core via ProjectReference.
         run: dotnet restore src/Radha.Tests/Radha.Tests.csproj
 
       - name: Build (warnings as errors)
@@ -62,33 +62,6 @@ jobs:
 
       - name: Run test suite
         run: dotnet run --project src/Radha.Tests -c Release --no-build | tee core-tests.log
-
-      - name: CLI smoke test — palette extraction
-        run: |
-          dotnet run --project src/Radha.Cli -c Release --no-build -- \
-            scheme extract src/Radha.Tests/fixtures/quadrant.png --variant vibrant --json \
-            | tee palette.json
-          python3 - <<'PY'
-          import json, sys
-          data = json.load(open("palette.json"))
-          roles = data["roles"]
-          assert len(roles) == 35, f"expected 35 roles, got {len(roles)}"
-          for key in ("primary", "onPrimary", "surface", "onSurface", "error"):
-              assert key in roles, f"missing role {key}"
-              assert roles[key].startswith("#") and len(roles[key]) == 7, f"bad hex for {key}"
-          assert data["seed"].startswith("#")
-          print(f"palette OK · seed {data['seed']} · primary {roles['primary']} · {len(roles)} roles")
-          PY
-
-      - name: CLI rejects invalid input
-        run: |
-          set +e
-          dotnet run --project src/Radha.Cli -c Release --no-build -- theme explode 2>err.txt
-          code=$?
-          set -e
-          test "$code" -eq 1 || { echo "expected exit 1, got $code"; cat err.txt; exit 1; }
-          grep -q "not a valid command" err.txt
-          echo "invalid command correctly rejected"
 
       - name: Upload logs
         if: always()
@@ -253,12 +226,12 @@ jobs:
           dotnet-version: 9.0.x
 
       - name: Build
-        run: dotnet build src/Radha.Cli/Radha.Cli.csproj -c Release
+        run: dotnet build src/Radha.Tests/Radha.Tests.csproj -c Release
 
       - name: Run benchmarks (fails on regression)
         run: |
-          dotnet run --project src/Radha.Cli -c Release --no-build -- bench --gate | tee bench.txt
-          dotnet run --project src/Radha.Cli -c Release --no-build -- bench --json > bench.json
+          dotnet run --project src/Radha.Tests -c Release --no-build -- bench --gate | tee bench.txt
+          dotnet run --project src/Radha.Tests -c Release --no-build -- bench --json > bench.json
           echo "### Benchmarks" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           cat bench.txt >> $GITHUB_STEP_SUMMARY

@@ -79,7 +79,6 @@ Full sample: [examples/shell.json](../examples/shell.json).
 
 ```text
 src/Radha.Core     engine (net9.0, zero packages, tested on Linux)
-src/Radha.Cli      radha.exe
 src/Radha.Tests    235-assertion harness + fixtures
 src/Radha.App      WinUI 3 shell (net9.0-windows)
 src/Radha.Native   C++/WinRT bridge (CMake)

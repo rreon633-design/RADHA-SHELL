@@ -23,7 +23,6 @@ Dependencies point downward only. The UI never P/Invokes directly; it consumes i
 | Project | TFM | Runs on Linux | Responsibility |
 |---|---|---|---|
 | `src/Radha.Core` | net9.0 | ✅ | palette engine, config, IPC, catalog, security, contracts |
-| `src/Radha.Cli` | net9.0 | ✅ | `radha` command surface, palette extraction, benchmarks |
 | `src/Radha.Tests` | net9.0 | ✅ | 235-assertion harness + image fixtures |
 | `src/Radha.App` | net9.0-windows | ❌ | WinUI 3 shell |
 | `src/Radha.Native` | C++20 | ❌ | native bridge (CMake) |
