@@ -63,3 +63,4 @@ Reviewing security: **11 → 17 → 19 → 20**.
 Deciding whether to adopt it: **21 → 8 → 19 → 23**.
 
 - [`VIRTUAL-DESKTOPS.md`](VIRTUAL-DESKTOPS.md) — per-build COM dispatch for desktop switching
+- [`COMPARISON-CAELESTIA.md`](COMPARISON-CAELESTIA.md) — feature-by-feature comparison with caelestia-shell, gap register and improvement plan

@@ -59,6 +59,11 @@ Every project is compiled here. Only one step in the whole pipeline is Windows-l
 | Bluetooth device list | ✅ **implemented** | `BluetoothDevice.GetDeviceSelectorFromPairingState(true)` + radio toggling via `Radio` |
 | **Lock screen** | ❌ **not built — excluded on request** | no credential provider, no lock UI, no auth code in this repo |
 
+### Comparison against caelestia-shell
+
+A feature-by-feature audit against the closest existing shell — 55 surfaces and services, plus a
+prioritised improvement plan — lives in [`docs/COMPARISON-CAELESTIA.md`](docs/COMPARISON-CAELESTIA.md).
+
 ### Verification tiers
 
 `Radha.App` is a WinUI 3 project, and one step of its build — `XamlCompiler.exe` turning `.xaml`
