@@ -3,6 +3,7 @@ using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text.Json;
 using Microsoft.Graphics.Canvas;
 using Radha.App.Config;
+using Radha.Core.Performance;
 using Radha.Core.Services;
 using Radha.Core.Theming;
 using Windows.Graphics.Imaging;
@@ -19,6 +20,7 @@ public sealed class WallpaperService : IWallpaperService
 {
     private static readonly string[] Extensions = { ".png", ".jpg", ".jpeg", ".bmp", ".webp" };
     private readonly ShellConfig _config;
+    private readonly PaletteCache _palettes = new(capacity: 16);
     private int _lastIndex = -1;
 
     public string? CurrentPath { get; private set; }
@@ -67,8 +69,8 @@ public sealed class WallpaperService : IWallpaperService
         {
             if (extension is ".png" or ".bmp")
             {
-                var buffer = ImageDecoder.DecodeFile(path);
-                return WallpaperPalette.PickSeed(WallpaperPalette.Extract(buffer));
+                // Cached by path + mtime + size: re-selecting a wallpaper is instant.
+                return _palettes.SeedFor(path);
             }
         }
         catch { /* fall through to WIC */ }

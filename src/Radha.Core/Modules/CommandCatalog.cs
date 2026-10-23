@@ -77,6 +77,8 @@ public static class CommandCatalog
         }
         lines.Add("");
         lines.Add("  radha scheme extract <image>     wallpaper → Material 3 palette (offline)");
+        lines.Add("  radha bench [--json] [--gate]    micro-benchmarks with p95 budgets (offline)");
+        lines.Add("  radha help                       this list");
         return string.Join(Environment.NewLine, lines);
     }
 }

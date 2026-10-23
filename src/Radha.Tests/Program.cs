@@ -30,6 +30,16 @@ public static class Program
         await TestIpcAsync();
         TestCli();
 
+        Console.WriteLine("\n--- security ---");
+        HardeningTests.RunSecurity(Check);
+        await IpcSecurityTests.RunAsync(Check);
+
+        Console.WriteLine("\n--- performance ---");
+        HardeningTests.RunPerformance(Check);
+
+        Console.WriteLine("\n--- feature hardening ---");
+        HardeningTests.RunFeatures(Check);
+
         Console.WriteLine();
         foreach (var failure in Failures) Console.WriteLine($"  FAIL {failure}");
         Console.WriteLine($"\n{_passed} passed, {Failures.Count} failed");
@@ -218,6 +228,14 @@ public static class Program
             Check("monitor override keeps base values", merged.Bar.Position == baseConfig.Bar.Position && merged.Bar.WorkspaceCount == 7);
             Check("monitor override is isolated", baseConfig.Bar.Height == 42);
             Check("unknown monitor has no override", store.LoadForMonitor("GENERIC").Bar.Height == 42);
+
+            // override hardening
+            Check("non-object override rejected", Throws<ArgumentException>(() => store.SaveMonitorOverride("X", "[1,2,3]")));
+            Check("oversized override rejected", Throws<ArgumentException>(() =>
+                store.SaveMonitorOverride("X", "{\"a\":\"" + new string('x', ConfigStore.MaxOverrideBytes) + "\"}")));
+            Check("empty override rejected", Throws<ArgumentException>(() => store.SaveMonitorOverride("X", " ")));
+            Check("hostile monitor name is contained", store.SaveMonitorOverride("../../evil", "{\"bar\":{\"height\":44}}")
+                .Contains(Path.GetFileName(store.MonitorConfigDirectory)));
         }
         finally
         {
@@ -335,6 +353,13 @@ public static class Program
     }
 
     // ---------------- harness ----------------
+
+    private static bool Throws<T>(Action action) where T : Exception
+    {
+        try { action(); return false; }
+        catch (T) { return true; }
+        catch { return false; }
+    }
 
     private static void Check(string name, bool condition)
     {

@@ -13,7 +13,8 @@
 │ SERVICES (Win)    GSMTC · NAudio/WASAPI · LibreHardwareMonitor│
 │                   NetworkInformation · Radios · Open-Meteo   │
 ├──────────────────────────────────────────────────────────────┤
-│ CORE (portable)   palettes · config · IPC · command catalog  │
+│ CORE (portable)   palettes · config · IPC · catalog · guards │
+│                   security · caches · search · motion · weather│
 │                   service contracts + DTOs (net9.0, tested)  │
 ├──────────────────────────────────────────────────────────────┤
 │ NATIVE            C++/WinRT bridge: AppBar, DWM, hotkeys, VD │
@@ -43,6 +44,33 @@ panel never creates a new HWND storm — it toggles visibility and plays the Com
 - Theme changes replace the immutable `ThemeViewModel`; one `PropertyChanged(nameof(Theme))`
   re-colours the tree. List templates carry their own brushes because XAML name scope prevents
   template bindings from reaching the view model's theme.
+
+## Security boundary
+
+```
+untrusted ──► InputGuard ──► CommandCatalog ──► ShellHost.Execute ──► services
+             PathGuard        (module + command)     │
+             Redactor                                └─► audit log (redacted)
+```
+
+| Module | Responsibility |
+|---|---|
+| `Security/InputGuard` | request, argument, config-key, numeric and colour validation |
+| `Security/PathGuard` | root containment, filename sanitising, device-path rejection |
+| `Security/Redactor` | token/key redaction for errors, logs and audit records |
+| `Security/RateLimiter` | per-client token bucket |
+| `Ipc/IpcServerOptions` | frame ceiling, limiter, validator, audit hook, socket permissions |
+
+## Caching & performance
+
+| Module | Purpose |
+|---|---|
+| `Performance/LruCache` | bounded O(1) LRU |
+| `Performance/PaletteCache` | wallpaper → palette, keyed by path+mtime+size |
+| `Performance/LatencyRecorder` | p50/p95/p99 for `radha bench --gate` |
+| `Search/FuzzyMatcher` | launcher ranking (prefix > substring > subsequence > acronym) |
+| `Motion/SpringSpec` | composition spring presets, settle time, step response |
+| `Weather/WeatherCodes` | WMO 4677 mapping shared by service and UI |
 
 ## IPC
 

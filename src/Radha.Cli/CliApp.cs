@@ -26,6 +26,10 @@ public static class CliApp
         if (args[0] == "scheme")
             return RunScheme(args, stdout, stderr);
 
+        // Offline performance gate (used by CI).
+        if (args[0] == "bench")
+            return await Bench.RunAsync(args, stdout, stderr, ct);
+
         if (!CommandCatalog.TryParseModule(args[0], out var module))
         {
             stderr.WriteLine($"radha: unknown module '{args[0]}'");

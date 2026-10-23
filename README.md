@@ -29,7 +29,7 @@ Windows 10/11 + Windows App SDK).
 
 | Area | State | Notes |
 |---|---|---|
-| `Radha.Core` — palette engine, wallpaper decoding, config, IPC protocol, command catalog, service contracts | ✅ **built and tested here** | 130 assertions pass, zero failures |
+| `Radha.Core` — palette engine, wallpaper decoding, config, IPC protocol, command catalog, security, performance, service contracts | ✅ **built and tested here** | **235 assertions pass, zero failures** |
 | `radha` CLI — palette extraction, command surface, IPC client | ✅ **built and tested here** | runs offline for `scheme extract` |
 | `Radha.App` — WinUI 3 bar / dashboard / launcher / control centre / notifications / OSD / session | 🟡 **written, not compiled** | needs a Windows build pass; see `docs/BUILD.md` |
 | `Radha.Native` — AppBar dock, blur, global hotkeys, VD stubs | 🟡 **written, not compiled** | CMake project for MSVC |
@@ -95,8 +95,11 @@ Every push to `main` and every pull request runs `.github/workflows/ci.yml`:
 
 | Job | Runner | Gate |
 |---|---|---|
-| `core` | ubuntu | builds Core + CLI + tests with **warnings as errors**, runs all 130 assertions, smoke-tests the palette CLI and asserts the JSON contract (35 roles, valid hex) |
+| `core` | ubuntu | builds Core + CLI + tests with **warnings as errors**, runs all 235 assertions, smoke-tests the palette CLI and asserts the JSON contract (35 roles, valid hex) |
 | `invariants` | ubuntu | fails if any HTML/CSS/JS/Electron/WebView2 artifact appears in `src/`, and validates every XAML / csproj / manifest / JSON file |
+| `security` | ubuntu | secret scan (PATs, keys, private-key blocks), dependency policy (`Core` must stay package-free), no tracked binaries/build output, 2 MiB file ceiling |
+| `performance` | ubuntu | runs `radha bench --gate`; fails on any p95 budget regression |
+| `docs` | ubuntu | asserts all 24 PRD documents + policies exist, validates internal markdown links, and fails if lock-screen code appears in `src/` |
 | `winui` | windows | compiles the WinUI 3 shell (`-p:Platform=x64`) and uploads the app folder |
 | `native` | windows | compiles the C++/WinRT bridge with MSVC and checks `RadhaNative.dll` exists |
 | `shaders` | windows | compiles all three HLSL files to pixel shaders with `fxc` |
@@ -135,6 +138,15 @@ The bar appears as a docked app bar; the overlay window stays hidden until a pan
 Start with `radha dashboard toggle`, `radha controlcenter toggle`, `radha launcher toggle`.
 
 ---
+
+## Documentation
+
+The full PRD set lives in [`docs/`](docs/README.md): problem statement, aim/vision, objectives,
+target audience, tech stack, architecture, design philosophy, features, novel features, backend
+services, API/IPC, workflow, setup, development process, phase plan, performance, security,
+maintenance, problematic areas, risks, advantages, future scope, success metrics and appendix.
+
+Policies: [SECURITY.md](SECURITY.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [CHANGELOG.md](CHANGELOG.md) · [LICENSE](LICENSE)
 
 ## Command surface
 

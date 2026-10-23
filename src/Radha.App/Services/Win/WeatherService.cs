@@ -2,6 +2,7 @@ using System.Net.Http;
 using System.Text.Json;
 using Radha.App.Config;
 using Radha.Core.Services;
+using Radha.Core.Weather;
 
 namespace Radha.App.Services.Win;
 
@@ -74,11 +75,11 @@ public sealed class WeatherService : IWeatherService
             for (var i = start; i < Math.Min(start + 5, times.GetArrayLength()); i++)
             {
                 var label = DateTime.TryParse(times[i].GetString(), out var time) ? time.ToString("HH:mm") : "--";
-                hours.Add(new WeatherHour(label, IconFor(codes[i].GetInt32()).Key,
+                hours.Add(new WeatherHour(label, WeatherCodes.For(codes[i].GetInt32()).Key,
                     temps[i].GetDouble(), precip[i].GetInt32()));
             }
 
-            var mapped = IconFor(code);
+            var mapped = WeatherCodes.For(code);
             Current = new WeatherNow(
                 string.IsNullOrWhiteSpace(_city) ? "Nearby" : _city,
                 temp,
@@ -119,20 +120,4 @@ public sealed class WeatherService : IWeatherService
         catch { }
     }
 
-    /// <summary>WMO weather code → icon key + label.</summary>
-    private static (string Key, string Label) IconFor(int code) => code switch
-    {
-        0 => ("clear", "Clear sky"),
-        1 => ("partly", "Mostly clear"),
-        2 => ("partly", "Partly cloudy"),
-        3 => ("cloudy", "Overcast"),
-        45 or 48 => ("fog", "Fog"),
-        51 or 53 or 55 or 56 or 57 => ("rain", "Drizzle"),
-        61 or 63 or 65 or 66 or 67 => ("rain", "Rain"),
-        71 or 73 or 75 or 77 => ("snow", "Snow"),
-        80 or 81 or 82 => ("rain", "Showers"),
-        85 or 86 => ("snow", "Snow showers"),
-        95 or 96 or 99 => ("storm", "Thunderstorm"),
-        _ => ("partly", "Cloudy")
-    };
-}
+

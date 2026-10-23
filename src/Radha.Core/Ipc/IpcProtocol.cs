@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Radha.Core.Security;
 
 namespace Radha.Core.Ipc;
 
@@ -124,23 +125,60 @@ public static class IpcFraming
     }
 }
 
+/// <summary>Hardening knobs for the daemon endpoint (all optional, secure defaults).</summary>
+public sealed class IpcServerOptions
+{
+    /// <summary>Largest accepted frame; guards against memory-exhaustion via a huge header.</summary>
+    public int MaxFrameBytes { get; init; } = IpcFraming.MaxMessageBytes;
+
+    /// <summary>Per-client token bucket. Null disables throttling (used by unit tests).</summary>
+    public RateLimiter? Limiter { get; init; } = new(capacity: 60, refillPerSecond: 20);
+
+    /// <summary>Request validator; defaults to <see cref="InputGuard.ValidateRequest"/>.</summary>
+    public Func<IpcRequest, ValidationResult> Validator { get; init; } =
+        request => InputGuard.ValidateRequest(request.Module, request.Command, request.Args);
+
+    /// <summary>Restrict the Unix socket to the current user (chmod 0600) or the pipe ACL.</summary>
+    public bool RestrictToCurrentUser { get; init; } = true;
+
+    /// <summary>Rejected/slow requests are reported here for logging or tests.</summary>
+    public Action<IpcAudit>? Audit { get; init; }
+}
+
+/// <summary>One line of the audit trail: accepted, rejected, throttled or failed.</summary>
+public readonly record struct IpcAudit(
+    string ClientId,
+    string Module,
+    string Command,
+    IpcAuditOutcome Outcome,
+    string? Detail,
+    DateTimeOffset Timestamp);
+
+public enum IpcAuditOutcome { Accepted, Rejected, Throttled, Failed }
+
 /// <summary>
 /// Shell daemon endpoint. One handler processes every request; concurrency is per-client.
+/// Every request is validated and rate-limited before it reaches the handler.
 /// </summary>
 public sealed class IpcServer : IAsyncDisposable
 {
     private readonly string _endpoint;
     private readonly Func<IpcRequest, CancellationToken, Task<IpcResponse>> _handler;
+    private readonly IpcServerOptions _options;
     private readonly CancellationTokenSource _cts = new();
     private Socket? _listener;
     private Task? _acceptLoop;
     private readonly List<Task> _clients = new();
     private bool _disposed;
 
-    public IpcServer(string? endpoint, Func<IpcRequest, CancellationToken, Task<IpcResponse>> handler)
+    public IpcServer(
+        string? endpoint,
+        Func<IpcRequest, CancellationToken, Task<IpcResponse>> handler,
+        IpcServerOptions? options = null)
     {
         _endpoint = endpoint ?? IpcEndpoints.Default();
         _handler = handler;
+        _options = options ?? new IpcServerOptions();
     }
 
     public string Endpoint => _endpoint;
@@ -163,6 +201,18 @@ public sealed class IpcServer : IAsyncDisposable
         _listener = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
         _listener.Bind(new UnixDomainSocketEndPoint(_endpoint));
         _listener.Listen(16);
+
+        if (_options.RestrictToCurrentUser)
+        {
+            try
+            {
+                // Without this, socket creation honours umask and a permissive umask (0002)
+                // would let another local user drive the shell.
+                File.SetUnixFileMode(_endpoint, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
+            catch (PlatformNotSupportedException) { }
+            catch (IOException) { }
+        }
 
         while (!_cts.IsCancellationRequested)
         {
@@ -200,11 +250,12 @@ public sealed class IpcServer : IAsyncDisposable
 
     private async Task HandleClientAsync(Socket socket, CancellationToken ct)
     {
+        var clientId = Guid.NewGuid().ToString("N")[..8];
         await using var network = new NetworkStream(socket, ownsSocket: true);
-        await HandleStreamAsync(network, ct).ConfigureAwait(false);
+        await HandleStreamAsync(network, ct, clientId).ConfigureAwait(false);
     }
 
-    private async Task HandleStreamAsync(Stream stream, CancellationToken ct)
+    private async Task HandleStreamAsync(Stream stream, CancellationToken ct, string clientId = "pipe")
     {
         try
         {
@@ -215,13 +266,36 @@ public sealed class IpcServer : IAsyncDisposable
 
                 var started = System.Diagnostics.Stopwatch.GetTimestamp();
                 IpcResponse response;
+
+                // 1. throttle  2. validate  3. only then run the handler.
+                if (_options.Limiter is { } limiter && !limiter.TryAcquire(clientId))
+                {
+                    Audit(clientId, request, IpcAuditOutcome.Throttled, "rate limit exceeded");
+                    response = IpcResponse.Fail(request.Id, "rate limit exceeded — slow down", 0);
+                    await IpcFraming.WriteAsync(stream, response, ct).ConfigureAwait(false);
+                    continue;
+                }
+
+                var validation = _options.Validator(request);
+                if (!validation.IsValid)
+                {
+                    Audit(clientId, request, IpcAuditOutcome.Rejected, validation.Error);
+                    response = IpcResponse.Fail(request.Id, validation.Error ?? "invalid request", 0);
+                    await IpcFraming.WriteAsync(stream, response, ct).ConfigureAwait(false);
+                    continue;
+                }
+
                 try
                 {
                     response = await _handler(request, ct).ConfigureAwait(false);
+                    Audit(clientId, request, IpcAuditOutcome.Accepted, null);
                 }
                 catch (Exception ex)
                 {
-                    response = IpcResponse.Fail(request.Id, ex.Message);
+                    // Exception text can carry paths or tokens: redact before it leaves the process.
+                    var safe = Redactor.Redact(ex.Message);
+                    Audit(clientId, request, IpcAuditOutcome.Failed, safe);
+                    response = IpcResponse.Fail(request.Id, safe);
                 }
                 var elapsed = (System.Diagnostics.Stopwatch.GetTimestamp() - started) * 1000.0 /
                               System.Diagnostics.Stopwatch.Frequency;
@@ -233,7 +307,19 @@ public sealed class IpcServer : IAsyncDisposable
         catch (EndOfStreamException) { /* client vanished */ }
         catch (IOException) { /* pipe broke */ }
         catch (OperationCanceledException) { }
+        catch (System.Text.Json.JsonException) { /* garbage frame: drop this connection only */ }
+        catch (InvalidDataException) { /* impossible frame length: drop this connection only */ }
+        catch (Exception ex)
+        {
+            // Never let a single client take down the accept loop.
+            Audit(clientId, new IpcRequest("?", "?", "?", Array.Empty<string>()),
+                IpcAuditOutcome.Failed, Redactor.Redact(ex.Message));
+        }
     }
+
+    private void Audit(string clientId, IpcRequest request, IpcAuditOutcome outcome, string? detail) =>
+        _options.Audit?.Invoke(new IpcAudit(clientId, request.Module, request.Command, outcome,
+            detail, DateTimeOffset.Now));
 
     public async ValueTask DisposeAsync()
     {

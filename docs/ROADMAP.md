@@ -12,8 +12,13 @@ described. "Written but not verified" is called out explicitly in the README sta
 - [x] CLI: command surface + offline palette extraction — tested
 - [x] WinUI bar, dashboard (overview / media / performance), launcher, control centre,
       notification centre, OSD, session menu — written
+- [x] Security hardening: input/path guards, secret redaction, IPC rate limiting, audit log,
+      owner-only socket — tested
+- [x] Performance: LRU + palette cache, benchmarks with p95 budgets, CI gate
+- [x] Complete documentation set (docs/01–24 + policies)
 - [x] SMTC media, WASAPI+FFT visualiser, LHM telemetry, radios, Open-Meteo weather — written
 - [ ] **Windows build pass**: compile, fix XAML issues, run on a real desktop
+- [ ] Replace remaining 🟡 items in docs/08-features.md as the Windows jobs go green
 - [ ] Per-monitor bars and panel anchoring
 - [ ] App-bar dock verified against maximised / fullscreen windows
 

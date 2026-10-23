@@ -8,6 +8,7 @@ using Radha.App.Views;
 using Radha.Core.Config;
 using Radha.Core.Ipc;
 using Radha.Core.Modules;
+using Radha.Core.Security;
 using Radha.Core.Services;
 using Radha.Core.Theming;
 
@@ -36,6 +37,7 @@ public sealed class ShellHost : IAsyncDisposable
     private readonly IBluetoothService _bluetooth;
     private readonly IWorkspaceService _workspaces;
     private readonly IpcServer _ipc;
+    private readonly string _auditLogPath;
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(1) };
     private DispatcherTimer? _weatherTimer;
 
@@ -96,7 +98,15 @@ public sealed class ShellHost : IAsyncDisposable
         Overlay = new OverlayWindow(_state, _dashboard, _launcher, _controlCenter);
         Osd = new OsdWindow(_state);
 
-        _ipc = new IpcServer(null, HandleIpcAsync);
+        _auditLogPath = Path.Combine(_config.Paths.Logs, "ipc-audit.log");
+        try { Directory.CreateDirectory(Path.GetDirectoryName(_auditLogPath)!); } catch { }
+
+        _ipc = new IpcServer(null, HandleIpcAsync, new IpcServerOptions
+        {
+            Limiter = new RateLimiter(capacity: 60, refillPerSecond: 20),
+            RestrictToCurrentUser = true,
+            Audit = WriteAudit
+        });
 
         _clock.Tick += (_, _) => _state.Tick();
     }
@@ -135,6 +145,26 @@ public sealed class ShellHost : IAsyncDisposable
     }
 
     // ---------------- IPC ----------------
+
+    /// <summary>
+    /// Append-only audit trail. Every field is redacted before it touches disk, and logging
+    /// failures never affect command handling.
+    /// </summary>
+    private void WriteAudit(IpcAudit audit)
+    {
+        try
+        {
+            var line = string.Join('\t',
+                audit.Timestamp.ToString("O"),
+                audit.ClientId,
+                Redactor.Redact(audit.Module) ?? "-",
+                Redactor.Redact(audit.Command) ?? "-",
+                audit.Outcome,
+                Redactor.Redact(audit.Detail) ?? "");
+            File.AppendAllText(_auditLogPath, line + Environment.NewLine);
+        }
+        catch { /* audit is best-effort, never fatal */ }
+    }
 
     private Task<IpcResponse> HandleIpcAsync(IpcRequest request, CancellationToken ct)
     {
@@ -261,7 +291,7 @@ public sealed class ShellHost : IAsyncDisposable
                     case "next": _ = _media.NextAsync(); return "ok";
                     case "previous": _ = _media.PreviousAsync(); return "ok";
                     case "seek":
-                        if (args.Length > 0 && int.TryParse(args[0], out var seconds))
+                        if (args.Length > 0 && InputGuard.TryParseInt(args[0], 0, 86_400, out var seconds))
                             _ = _media.SeekAsync(TimeSpan.FromSeconds(seconds));
                         return "ok";
                     case "mute": _audio.ToggleMute(); return _audio.Muted ? "muted" : "unmuted";
@@ -293,14 +323,14 @@ public sealed class ShellHost : IAsyncDisposable
                             dark = _theme.Current.IsDark
                         });
                     case "volume":
-                        if (args.Length > 0 && int.TryParse(args[0], out var volume))
+                        if (args.Length > 0 && InputGuard.TryParseInt(args[0], 0, 100, out var volume))
                         {
                             _audio.SetVolume(volume);
                             _state.ShowOsd("Volume", volume);
                         }
                         return _audio.Volume.ToString();
                     case "brightness":
-                        if (args.Length > 0 && double.TryParse(args[0], out var brightness))
+                        if (args.Length > 0 && InputGuard.TryParseNumber(args[0], 0, 100, out var brightness))
                             _state.ShowOsd("Brightness", brightness);
                         return args.FirstOrDefault() ?? "0";
                     case "uptime":

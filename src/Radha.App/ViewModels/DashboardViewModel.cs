@@ -3,6 +3,7 @@ using System.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Xaml.Media;
+using Radha.Core.Search;
 using Radha.Core.Services;
 
 namespace Radha.App.ViewModels;
@@ -288,6 +289,7 @@ public sealed partial class DashboardViewModel : ObservableObject
     private static string Format(TimeSpan span) =>
         span.TotalHours >= 1 ? $"{(int)span.TotalHours}:{span.Minutes:00}:{span.Seconds:00}" : $"{span.Minutes}:{span.Seconds:00}";
 
+    /// <summary>Weather icon keys come from Radha.Core.Weather.WeatherCodes.</summary>
     private static string GlyphFor(string key) => key switch
     {
         "clear" => "\uE706",
@@ -405,29 +407,9 @@ public sealed partial class LauncherViewModel : ObservableObject
         foreach (var entry in entries) Results.Add(new LauncherItemVm(entry, _state.Theme));
     }
 
+    /// <summary>Delegates to the shared, unit-tested matcher in Radha.Core.</summary>
     private IEnumerable<AppEntry> Score(string query) =>
-        _apps
-            .Select(app => (App: app, Score: Fuzzy(app.Name, query)))
-            .Where(match => match.Score > 0)
-            .OrderByDescending(match => match.Score)
-            .Select(match => match.App with { Score = match.Score });
-
-    private static int Fuzzy(string name, string query)
-    {
-        if (name.StartsWith(query, StringComparison.OrdinalIgnoreCase)) return 1000 - name.Length;
-        if (name.Contains(query, StringComparison.OrdinalIgnoreCase)) return 700 - name.IndexOf(query, StringComparison.OrdinalIgnoreCase);
-
-        var score = 0;
-        var index = 0;
-        foreach (var c in query)
-        {
-            var found = name.IndexOf(c.ToString(), index, StringComparison.OrdinalIgnoreCase);
-            if (found < 0) return 0;
-            score += found == 0 || name[found - 1] == ' ' ? 12 : 4;
-            index = found + 1;
-        }
-        return score;
-    }
+        FuzzyMatcher.Rank(_apps, query, app => app.Name, 12);
 
     private static bool Matches(string title, string query) =>
         title.Contains(query, StringComparison.OrdinalIgnoreCase);

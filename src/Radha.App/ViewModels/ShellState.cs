@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Xaml.Media;
+using Radha.Core.Security;
 using Radha.Core.Services;
 using Radha.Core.Theming;
 
@@ -148,7 +149,7 @@ public sealed partial class ShellState : ObservableObject
 
             case "osd":
                 var label = command is "brightness" ? "Brightness" : command is "mic" ? "Microphone" : "Volume";
-                var value = args.Length > 0 && double.TryParse(args[0], out var parsed)
+                var value = args.Length > 0 && InputGuard.TryParseNumber(args[0], 0, 100, out var parsed)
                     ? parsed
                     : command == "mic" ? (_audio.MicMuted ? 0 : 100) : _audio.Volume;
                 ShowOsd(label, value);

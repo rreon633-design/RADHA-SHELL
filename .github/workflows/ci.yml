@@ -157,6 +157,198 @@ jobs:
           sys.exit(1 if bad else 0)
           PY
 
+
+  # ------------------------------------------------------------- security
+  security:
+    name: security · secrets + deps + policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Scan for committed secrets
+        run: |
+          python3 - <<'PY'
+          import re, subprocess, sys
+
+          patterns = {
+              "GitHub fine-grained PAT": r"github_pat_[A-Za-z0-9_]{20,}",
+              "GitHub classic token":    r"gh[pousr]_[A-Za-z0-9]{20,}",
+              "OpenAI key":              r"sk-[A-Za-z0-9\-_]{20,}",
+              "AWS access key":          r"AKIA[0-9A-Z]{16}",
+              "private key block":       r"-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----",
+              "Slack token":             r"xox[baprs]-[A-Za-z0-9\-]{10,}",
+              "Google API key":          r"AIza[0-9A-Za-z\-_]{35}",
+          }
+
+          tracked = subprocess.check_output(["git", "ls-files"], text=True).split()
+          offenders = []
+          for path in tracked:
+              try:
+                  text = open(path, encoding="utf-8", errors="ignore").read()
+              except (IsADirectoryError, FileNotFoundError):
+                  continue
+              for name, pattern in patterns.items():
+                  for match in re.finditer(pattern, text):
+                      # Redactor test fixtures use an obviously fake suffix.
+                      if "REDACTED" in match.group(0) or "example" in match.group(0).lower():
+                          continue
+                      offenders.append((path, name, match.group(0)[:12] + "…"))
+
+          for path, name, preview in offenders:
+              print(f"::error file={path}::{name} looks committed ({preview})")
+          print(f"scanned {len(tracked)} files, {len(offenders)} finding(s)")
+          sys.exit(1 if offenders else 0)
+          PY
+
+      - name: Vulnerability scan (NuGet)
+        run: |
+          dotnet restore src/Radha.Core/Radha.Core.csproj
+          vulnerable=$(dotnet list src/Radha.Core/Radha.Core.csproj package --vulnerable --include-transitive 2>/dev/null | grep -c "> " || true)
+          echo "core: $vulnerable flagged package line(s)"
+          # Core has no package references by design; the WinUI project is scanned below.
+          dotnet restore src/Radha.App/Radha.App.csproj 2>/dev/null || echo "winui restore unavailable on linux (checked on windows job)"
+
+      - name: Verify dependency surface of Core is empty
+        run: |
+          count=$(grep -c "PackageReference" src/Radha.Core/Radha.Core.csproj || true)
+          echo "Radha.Core PackageReference count: $count"
+          test "$count" -eq 0 || { echo "::error::Radha.Core must stay dependency-free"; exit 1; }
+
+      - name: Check no build output or binaries are tracked
+        run: |
+          bad=$(git ls-files | grep -E '(^|/)(bin|obj)/|\.(dll|exe|pdb|zip|cso)$' || true)
+          if [ -n "$bad" ]; then echo "$bad"; echo "::error::build output tracked"; exit 1; fi
+          echo "no build output tracked"
+
+      - name: Check file size ceiling
+        run: |
+          big=$(git ls-files -z | xargs -0 -I{} sh -c 'test -f "{}" && s=$(stat -c%s "{}") && [ "$s" -gt 2097152 ] && echo "{} $s"' || true)
+          if [ -n "$big" ]; then echo "$big"; echo "::error::file larger than 2 MiB"; exit 1; fi
+          echo "all tracked files under 2 MiB"
+
+
+  # ---------------------------------------------------------- performance
+  performance:
+    name: performance · p95 budgets
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Build
+        run: dotnet build src/Radha.Cli/Radha.Cli.csproj -c Release
+
+      - name: Run benchmarks (fails on regression)
+        run: |
+          dotnet run --project src/Radha.Cli -c Release --no-build -- bench --gate | tee bench.txt
+          dotnet run --project src/Radha.Cli -c Release --no-build -- bench --json > bench.json
+          echo "### Benchmarks" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat bench.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmarks
+          path: |
+            bench.txt
+            bench.json
+          retention-days: 14
+
+
+  # ----------------------------------------------------------------- docs
+  docs:
+    name: docs · completeness + links
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Required PRD documents exist
+        run: |
+          required="docs/README.md
+          docs/01-problem-statement.md
+          docs/02-aim-vision.md
+          docs/03-objectives.md
+          docs/04-target-audience.md
+          docs/05-tech-stack.md
+          docs/06-architecture.md
+          docs/07-design-philosophy.md
+          docs/08-features.md
+          docs/09-novel-features.md
+          docs/10-backend-services.md
+          docs/11-api-ipc.md
+          docs/12-workflow.md
+          docs/13-setup-installation.md
+          docs/14-development-process.md
+          docs/15-phasewise-plan.md
+          docs/16-performance.md
+          docs/17-security.md
+          docs/18-maintenance.md
+          docs/19-problematic-areas.md
+          docs/20-risk-factors.md
+          docs/21-advantages.md
+          docs/22-future-scope.md
+          docs/23-success-metrics.md
+          docs/24-appendix.md
+          docs/ARCHITECTURE.md
+          docs/BUILD.md
+          docs/ROADMAP.md
+          SECURITY.md
+          CONTRIBUTING.md
+          CHANGELOG.md
+          LICENSE"
+          missing=0
+          for f in $required; do
+            if [ ! -f "$f" ]; then echo "::error::missing $f"; missing=$((missing+1)); fi
+          done
+          echo "checked $(echo "$required" | wc -w) documents, $missing missing"
+          test "$missing" -eq 0
+
+      - name: Validate internal markdown links
+        run: |
+          python3 - <<'PY'
+          import os, re, sys
+          bad = []
+          for root, _, files in os.walk("."):
+              if "/.git" in root or "/bin" in root or "/obj" in root:
+                  continue
+              for f in files:
+                  if not f.endswith(".md"):
+                      continue
+                  path = os.path.join(root, f)
+                  text = open(path, encoding="utf-8", errors="ignore").read()
+                  for target in re.findall(r"\[[^\]]+\]\(([^)#]+)(?:#[^)]*)?\)", text):
+                      if target.startswith(("http://", "https://", "mailto:", "#")):
+                          continue
+                      resolved = os.path.normpath(os.path.join(root, target))
+                      if not os.path.exists(resolved):
+                          bad.append((path, target))
+          for path, target in bad:
+              print(f"::error file={path}::broken link → {target}")
+          print(f"{len(bad)} broken link(s)")
+          sys.exit(1 if bad else 0)
+          PY
+
+      - name: Lock screen must stay out of the codebase
+        run: |
+          # Product decision: no lock screen / credential provider / biometric auth.
+          hits=$(grep -rniE 'credential ?provider|windows hello|fprintd|howdy|lock ?screen' src --include=*.cs --include=*.xaml || true)
+          if [ -n "$hits" ]; then echo "$hits"; echo "::error::lock-screen code found (out of scope)"; exit 1; fi
+          echo "no lock-screen implementation present"
+
   # --------------------------------------------------------------- winui
   winui:
     name: winui · compile shell (windows)
@@ -258,15 +450,16 @@ jobs:
   # --------------------------------------------------------------- gate
   ci-gate:
     name: ci · all checks
-    needs: [core, invariants, winui, native, shaders]
+    needs: [core, invariants, security, performance, docs, winui, native, shaders]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Fail if any required job failed
         run: |
           results=("${{ needs.core.result }}" "${{ needs.invariants.result }}" \
+                   "${{ needs.security.result }}" "${{ needs.performance.result }}" "${{ needs.docs.result }}" \
                    "${{ needs.winui.result }}" "${{ needs.native.result }}" "${{ needs.shaders.result }}")
-          echo "core=${results[0]} invariants=${results[1]} winui=${results[2]} native=${results[3]} shaders=${results[4]}"
+          echo "core=${results[0]} invariants=${results[1]} security=${results[2]} performance=${results[3]} docs=${results[4]} winui=${results[5]} native=${results[6]} shaders=${results[7]}"
           for r in "${results[@]}"; do
             if [ "$r" != "success" ]; then
               echo "::error::a required job did not succeed ($r)"

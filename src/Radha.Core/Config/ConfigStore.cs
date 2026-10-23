@@ -95,12 +95,28 @@ public sealed class ConfigStore
         File.Move(tmp, ConfigPath, overwrite: true); // atomic swap
     }
 
+    public const int MaxOverrideBytes = 64 * 1024;
+
     public string SaveMonitorOverride(string monitorKey, string json)
     {
-        var dir = Path.Combine(MonitorConfigDirectory, Sanitize(monitorKey));
+        if (string.IsNullOrWhiteSpace(json)) throw new ArgumentException("override JSON is empty", nameof(json));
+        if (System.Text.Encoding.UTF8.GetByteCount(json) > MaxOverrideBytes)
+            throw new ArgumentException($"override JSON exceeds {MaxOverrideBytes} bytes", nameof(json));
+
+        var parsed = JsonNode.Parse(json); // validates syntax before writing
+        if (parsed is not JsonObject)
+            throw new ArgumentException("monitor override must be a JSON object", nameof(json));
+
+        var safeKey = Sanitize(monitorKey);
+        var dir = Path.Combine(MonitorConfigDirectory, safeKey);
         Directory.CreateDirectory(dir);
         var path = Path.Combine(dir, "shell.json");
-        JsonNode.Parse(json); // validate before writing
+
+        // Never write outside the monitors directory, even if Sanitize changes meaning on another OS.
+        var rootFull = Path.GetFullPath(MonitorConfigDirectory);
+        if (!Path.GetFullPath(path).StartsWith(rootFull, StringComparison.Ordinal))
+            throw new InvalidOperationException("resolved override path escaped the monitors directory");
+
         File.WriteAllText(path, json);
         return path;
     }
