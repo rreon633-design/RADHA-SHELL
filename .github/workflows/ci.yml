@@ -492,10 +492,20 @@ jobs:
           if (-not $exe) { throw "RadhaNativeSmoke.exe was not produced" }
           $dllDir = Split-Path (Get-ChildItem build -Recurse -Filter RadhaNative.dll | Select-Object -First 1).FullName
           Copy-Item (Join-Path $dllDir 'RadhaNative.dll') (Split-Path $exe.FullName) -Force
-          & $exe.FullName
+          $out = & $exe.FullName 2>&1 | Out-String
+          Write-Host $out
           if ($LASTEXITCODE -ne 0) {
+            ($out -split [string][char]10) | Where-Object { $_ -match 'FAIL|checks,' } | ForEach-Object {
+              $m = $_.Trim().Replace('%', '%25')
+              if ($m) { Write-Host "::error::$m" }
+            }
+            if ($LASTEXITCODE -eq -1073741515) {
+              Write-Host "::error::RadhaNative.dll was not found next to the smoke executable"
+              Get-ChildItem -Recurse build -Filter '*.dll' | ForEach-Object { Write-Host "  dll: $($_.FullName)" }
+              Get-ChildItem (Split-Path $exe.FullName) | ForEach-Object { Write-Host "  exe dir: $($_.Name)" }
+            }
             Write-Host "::error::virtual desktop smoke test failed (exit $LASTEXITCODE)"
-            exit $LASTEXITCODE
+            exit 1
           }
 
       - name: Upload bridge
