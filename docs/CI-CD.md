@@ -82,6 +82,15 @@ Job logs require repository admin, but two things are public:
   failure is wrapped in `MSB3073`. Open the failed job and read the *Annotations* box.
 - **artifacts** — `Radha.App-win-x64`, `RadhaNative-win-x64`, `shaders-cso`, `benchmarks`.
 
+## Observed end-to-end (2026-10-23)
+
+| Step | Result |
+|---|---|
+| `git push origin main` | `ci` starts on its own (`event=push`) |
+| `ci` | 11/11 jobs green — incl. `winui` compiling the shell on Windows |
+| `release` | auto-fires on `workflow_run`, no dispatch |
+| Release | `v0.0.0-dev.10` — `RadhaShell-win-x64.zip`, 163 MB, self-contained |
+
 ## Adding a gate
 
 Add a job to `ci.yml`, then append it to `ci-gate.needs` **and** to the `results=( … )` array in the

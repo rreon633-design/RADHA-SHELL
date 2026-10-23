@@ -50,7 +50,7 @@ Every project is compiled here. Only one step in the whole pipeline is Windows-l
 |---|---|---|
 | `Radha.Core` — palette engine, wallpaper decoding, config, IPC protocol, command catalog, security, performance, service contracts | ✅ **built + tested** | **235 assertions, 0 failures**; 5 benchmark budgets green |
 | `radha` CLI — palette extraction, command surface, IPC client | ✅ **built + tested** | runs offline for `scheme extract` |
-| `Radha.App` — WinUI 3 bar / dashboard / launcher / control centre / notifications / OSD / session | ✅ **C# compiles against WinUI; XAML audited** | `app-typecheck` (27 files → 150 KB IL) + `xaml-audit` (0 findings). XAML→code generation + MSIX need Windows: tier 3 |
+| `Radha.App` — WinUI 3 bar / dashboard / launcher / control centre / notifications / OSD / session | ✅ **compiles and ships** | `xaml-audit` (0 findings, XA0–XA14) + `app-typecheck` (27 files) + **`winui` builds the shell on windows-latest**; every green `main` publishes a `RadhaShell-win-x64.zip` |
 | `Radha.Native` — AppBar dock, blur, global hotkeys, VD stubs | ✅ **compiled + linked** | 5 files clean under `clang++ -Werror`; `RadhaNative.dll` (PE32+ x86-64) exports all 14 symbols |
 | `Radha.Shaders` — Blur / Morph / Grain | ✅ **compiled** | 3/3 → DXIL via `dxc -T ps_6_0`; not yet wired into the app |
 | Virtual desktop switching | ❌ **not implemented** | needs undocumented `IVirtualDesktopManagerInternal`; deliberately stubbed, not faked |
@@ -70,9 +70,11 @@ in three tiers, and CI runs the first two on every push:
 | 2 · C# type-check (`tools/TypeCheck`) | Linux | All 27 App source files compile against the genuine `Microsoft.WinUI.dll` / WinRT projections from Windows App SDK 1.6, with `InitializeComponent()` and `x:Name` fields generated from the markup. Wrong API names, bad overloads, invalid casts and syntax errors surface here. |
 | 3 · full build (`winui` job) | `windows-latest` | XAML→C# codegen, MSIX packaging, launch. The only tier that can produce a runnable shell. |
 
-Tiers 1 and 2 are not a substitute for tier 3 — they cannot catch a XAML parse error or a runtime
-layout bug (tier 1 already found a typo'd `{Binding}` while tier 2 found 22 compile errors, so they
-are worth running every push).
+Tiers 1 and 2 are not a substitute for tier 3 — they cannot see everything the XAML compiler sees.
+All three have earned their keep: tier 2 found **22 compile errors** that would have failed the
+Windows build, tier 1 found a typo'd `{Binding}`, and tier 3 (Windows) caught two controls that only
+exist in WPF — `UniformGrid` and `TextBlock.LetterSpacing` — both now detected off-Windows by
+XA13/XA14 in the audit.
 
 ### Verified here (Linux, .NET 9)
 
