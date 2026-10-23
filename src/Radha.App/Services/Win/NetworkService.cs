@@ -38,7 +38,7 @@ public sealed class NetworkService : INetworkService
                 var signal = profile.IsWlanConnectionProfile ? profile.GetSignalBars() ?? 0 : 4;
                 Current = new NetworkState(
                     connected,
-                    profile.IsWlanConnectionProfile ? "Wi-Fi" : profile.IsEthernetConnectionProfile ? "Ethernet" : "Network",
+                    profile.IsWlanConnectionProfile ? "Wi-Fi" : profile.IsWwanConnectionProfile ? "Mobile" : "Ethernet",
                     profile.IsWlanConnectionProfile ? profile.ProfileName : null,
                     signal,
                     profile.GetConnectionCost()?.NetworkCostType is NetworkCostType.Fixed or NetworkCostType.Variable,

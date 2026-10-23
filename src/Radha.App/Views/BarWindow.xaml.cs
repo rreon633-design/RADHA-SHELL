@@ -78,12 +78,14 @@ public sealed partial class BarWindow : Window
         _appWindow = GetAppWindowForCurrentWindow();
         if (_appWindow is null) return;
 
-        var presenter = _appWindow.Presenter as OverlappedPresenter;
-        presenter?.SetBorderAndTitleBar(false, false);
-        presenter?.IsResizable = false;
-        presenter?.IsMaximizable = false;
-        presenter?.IsMinimizable = false;
-        presenter?.IsAlwaysOnTop = true;
+        if (_appWindow.Presenter is OverlappedPresenter presenter)
+        {
+            presenter.SetBorderAndTitleBar(false, false);
+            presenter.IsResizable = false;
+            presenter.IsMaximizable = false;
+            presenter.IsMinimizable = false;
+            presenter.IsAlwaysOnTop = true;
+        }
 
         var display = DisplayArea.GetFromWindowId(_appWindow.Id, DisplayAreaFallback.Primary);
         var width = display.WorkArea.Width;

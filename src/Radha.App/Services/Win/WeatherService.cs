@@ -1,6 +1,6 @@
 using System.Net.Http;
 using System.Text.Json;
-using Radha.App.Config;
+using Radha.Core.Config;
 using Radha.Core.Services;
 using Radha.Core.Weather;
 
@@ -121,3 +121,4 @@ public sealed class WeatherService : IWeatherService
     }
 
 
+}

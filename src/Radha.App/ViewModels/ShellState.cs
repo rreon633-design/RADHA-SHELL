@@ -84,7 +84,7 @@ public sealed partial class ShellState : ObservableObject
     [RelayCommand] private void ToggleSession() => TogglePanel(() => IsSessionOpen, v => IsSessionOpen = v);
 
     [RelayCommand]
-    private void CloseAll()
+    public void CloseAll()
     {
         ClosePanels();
         OverlayChanged?.Invoke(this, EventArgs.Empty);
@@ -194,7 +194,8 @@ public sealed partial class ShellState : ObservableObject
     private void SyncWorkspaces()
     {
         Workspaces.Clear();
-        foreach (var workspace in _workspaces.Workspaces) Workspaces.Add(workspace);
+        foreach (var w in _workspaces.Workspaces)
+            Workspaces.Add(new WorkspaceItem(w.Index, w.Active, w.Occupied, w.WindowCount));
     }
 
     /// <summary>Notifications are wrapped so list templates can carry their own theme brushes.</summary>

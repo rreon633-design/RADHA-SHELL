@@ -1,5 +1,6 @@
 using System.Collections.Specialized;
 using Microsoft.Graphics.Canvas;
+using Microsoft.Graphics.Canvas.Brushes;
 using Microsoft.Graphics.Canvas.Geometry;
 using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI.Xaml;
@@ -91,7 +92,7 @@ public sealed class LineGraph : UserControl
             var y = height - (float)Math.Clamp(values[i] / max, 0, 1) * height;
             geometry.AddLine(x, y);
         }
-        geometry.EndFigure(true);
+        geometry.EndFigure(CanvasFigureLoop.Closed);
 
         using var path = CanvasGeometry.CreatePath(geometry);
         var fillColor = Color.FromArgb(38, Accent.R, Accent.G, Accent.B);

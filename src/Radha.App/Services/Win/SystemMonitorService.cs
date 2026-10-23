@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using LibreHardwareMonitor.Hardware;
 using Radha.Core.Services;
 using Windows.Devices.Power;
+using Windows.System.Power;
 
 namespace Radha.App.Services.Win;
 
@@ -21,7 +22,7 @@ public sealed class SystemMonitorService : ISystemMonitorService, IDisposable
     private Timer? _timer;
     private long _lastBytes;
     private DateTime _lastSample = DateTime.UtcNow;
-    private readonly TimeSpan _bootTime = DateTime.UtcNow.AddMilliseconds(-Environment.TickCount64);
+    private readonly DateTime _bootTime = DateTime.UtcNow.AddMilliseconds(-Environment.TickCount64);
 
     public SystemSample? Latest { get; private set; }
     public event EventHandler<SystemSample>? Sampled;

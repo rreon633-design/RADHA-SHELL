@@ -1,3 +1,4 @@
+using Radha.Core.Config;
 using Radha.Core.Services;
 using Radha.Core.Theming;
 
@@ -14,7 +15,7 @@ public sealed class ThemeService : IThemeService
 
     public event EventHandler<MaterialScheme>? Changed;
 
-    public void Initialize(Config.ShellConfig config)
+    public void Initialize(ShellConfig config)
     {
         _variant = Enum.TryParse<SchemeVariant>(config.Appearance.SchemeVariant, true, out var variant)
             ? variant

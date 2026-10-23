@@ -2,7 +2,11 @@
 #include "Internal.h"
 #include <dwmapi.h>
 
+// MSVC auto-links through the pragma; CMakeLists.txt links dwmapi explicitly for every toolchain,
+// so this stays guarded to avoid "unknown pragma" warnings under clang/MinGW.
+#ifdef _MSC_VER
 #pragma comment(lib, "dwmapi.lib")
+#endif
 
 extern "C" {
 

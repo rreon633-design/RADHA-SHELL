@@ -40,8 +40,10 @@ public sealed class WorkspaceService : IWorkspaceService
 }
 
 /// <summary>Monitor enumeration via DisplayArea (per-monitor scaling aware).</summary>
-public sealed class DisplayService : IDisplayService
+public sealed class DisplayService : IDisplayService, IDisposable
 {
+    private DisplayAreaWatcher? _watcher;
+
     public IReadOnlyList<MonitorInfo> Monitors { get; private set; } = Array.Empty<MonitorInfo>();
     public event EventHandler? Changed;
 
@@ -50,13 +52,13 @@ public sealed class DisplayService : IDisplayService
         Refresh();
         try
         {
-            DisplayArea.PrimaryChanged += (_, _) =>
-            {
-                Refresh();
-                Changed?.Invoke(this, EventArgs.Empty);
-            };
+            _watcher = DisplayArea.CreateWatcher();
+            _watcher.Updated += OnDisplaysChanged;
+            _watcher.Added += OnDisplaysChanged;
+            _watcher.Removed += OnDisplaysChanged;
+            _watcher.Start();
         }
-        catch { }
+        catch { /* windowing APIs unavailable (headless / session 0) */ }
     }
 
     private void Refresh()
@@ -75,5 +77,26 @@ public sealed class DisplayService : IDisplayService
                 .ToList();
         }
         catch { }
+    }
+
+    // Fires on any topology change: resolution, DPI, monitor hot-plug, primary reassignment.
+    private void OnDisplaysChanged(DisplayAreaWatcher sender, object args)
+    {
+        Refresh();
+        Ui.Post(() => Changed?.Invoke(this, EventArgs.Empty));
+    }
+
+    public void Dispose()
+    {
+        if (_watcher is null) return;
+        try
+        {
+            _watcher.Updated -= OnDisplaysChanged;
+            _watcher.Added -= OnDisplaysChanged;
+            _watcher.Removed -= OnDisplaysChanged;
+            _watcher.Stop();
+        }
+        catch { }
+        _watcher = null;
     }
 }

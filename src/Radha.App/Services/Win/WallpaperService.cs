@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text.Json;
 using Microsoft.Graphics.Canvas;
-using Radha.App.Config;
+using Radha.Core.Config;
 using Radha.Core.Performance;
 using Radha.Core.Services;
 using Radha.Core.Theming;
@@ -62,7 +62,7 @@ public sealed class WallpaperService : IWallpaperService
         return await SetAsync(wallpapers[_lastIndex]);
     }
 
-    private static async Task<Rgb> ExtractSeedAsync(string path)
+    private async Task<Rgb> ExtractSeedAsync(string path)
     {
         var extension = Path.GetExtension(path).ToLowerInvariant();
         try

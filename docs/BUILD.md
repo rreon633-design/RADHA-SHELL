@@ -7,8 +7,53 @@
 | `Radha.Core` | ✅ | ✅ | `net9.0`, no OS APIs |
 | `Radha.Cli` | ✅ | ✅ | produces `radha.exe` |
 | `Radha.Tests` | ✅ | ✅ | console harness, no NuGet test packages |
-| `Radha.App` | ❌ | ✅ | WinUI 3, `net9.0-windows10.0.19041.0` |
-| `Radha.Native` | ❌ | ✅ | CMake + MSVC |
+| `Radha.App` (C# type-check) | ✅ | ✅ | `tools/TypeCheck` — compiles every `.cs` against the real WinUI reference assemblies |
+| `Radha.App` (XAML → runnable shell) | ❌ | ✅ | needs `XamlCompiler.exe` + MSIX; Windows-only |
+| `Radha.Native` | ✅ (cross) | ✅ | CMake + MSVC on Windows; `clang++ -target x86_64-w64-windows-gnu` on Linux |
+| `Radha.Shaders` | ✅ (cross) | ✅ | `dxc -T ps_6_0`; `fxc /T ps_5_0` on the Windows runner |
+
+### Why `Radha.App` is split
+
+`XamlCompiler.exe` — the step that turns `.xaml` into C# and emits the `InitializeComponent()` body —
+ships as a Windows PE executable inside the `Microsoft.WindowsAppSDK` package, and the MSIX/PRI tasks
+load Windows-only MSBuild assemblies. Neither runs on Linux. Everything else in `Radha.App` is
+ordinary C# that can be compiled anywhere, so CI proves as much as it can off-Windows:
+
+```bash
+# tier 1 — static audit: x:Class, handlers, resource keys, binding roots/paths, namespaces
+dotnet run --project tools/XamlAudit -c Release
+
+# tier 2 — type-check all App C# against Microsoft.WinUI.dll + WinRT projections
+dotnet build tools/TypeCheck/Radha.App.TypeCheck.csproj -c Release -p:Platform=x64
+```
+
+Tier 2 needs no Windows SDK and no XAML compiler: `tools/TypeCheck/generate-stubs.py` reads the
+markup and emits an `InitializeComponent()` plus one field per `x:Name`, typed from the element, so
+the real `csc` sees exactly the member surface the XAML compiler would have produced. The generated
+files land in `tools/TypeCheck/generated/` (git-ignored) automatically during the build.
+
+`MSYS`/`WSL` note: because the PRI and MSIX targets are switched off in that project, it produces a
+library — it is a *type check*, not a runnable app. Only the `winui` CI job (or a Windows machine)
+can build the shell.
+
+### Cross-compiling `Radha.Native` on Linux
+
+Any LLVM-MinGW toolchain works and links against the same import libraries MSVC uses:
+
+```bash
+x86_64-w64-mingw32-clang++ -std=c++20 -O2 -Wall -Wextra -Werror \
+  -DUNICODE -D_UNICODE -DWIN32_LEAN_AND_MEAN -DNOMINMAX -DRADHANATIVE_EXPORTS -Iinclude \
+  -shared src/*.cpp src/internal/*/*.cpp \
+  -o RadhaNative.dll -luser32 -lshell32 -ldwmapi -lole32 -lshcore
+```
+
+### Compiling the shaders on Linux
+
+```bash
+LD_LIBRARY_PATH=<dxc-linux>/lib <dxc-linux>/bin/dxc -T ps_6_0 -E main -Fo Blur.dxil src/Blur.hlsl
+```
+
+The Windows job uses `fxc /T ps_5_0`; the source compiles under both without changes.
 
 ## Windows prerequisites
 

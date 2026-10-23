@@ -1,4 +1,6 @@
+using Microsoft.UI;
 using Microsoft.UI.Composition.SystemBackdrops;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Radha.App.Interop;
@@ -55,9 +57,11 @@ public sealed partial class OsdWindow : Window
     private void ConfigureWindow()
     {
         _appWindow = AppWindow.GetFromWindowId(Win32Interop.GetWindowIdFromWindow(WindowNative.GetWindowHandle(this)));
-        var presenter = _appWindow.Presenter as OverlappedPresenter;
-        presenter?.SetBorderAndTitleBar(false, false);
-        presenter?.IsAlwaysOnTop = true;
+        if (_appWindow.Presenter is OverlappedPresenter presenter)
+        {
+            presenter.SetBorderAndTitleBar(false, false);
+            presenter.IsAlwaysOnTop = true;
+        }
 
         var display = DisplayArea.GetFromWindowId(_appWindow.Id, DisplayAreaFallback.Primary);
         const int width = 280;

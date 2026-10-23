@@ -23,21 +23,37 @@ Caelestia's shell for Hyprland.
 
 ## Status — what is actually built
 
-This repository is an honest split between **verified code** and **Windows-only code that has been
-written but not compiled in this environment** (the build machine here is Linux; WinUI 3 requires
-Windows 10/11 + Windows App SDK).
+Every project is compiled here. Only one step in the whole pipeline is Windows-locked — running
+`XamlCompiler.exe` and packing MSIX — so `Radha.App` is verified in three tiers (see
+[Verification tiers](#verification-tiers)); the windows job in CI is the authoritative one.
 
-| Area | State | Notes |
+| Area | State | Evidence |
 |---|---|---|
-| `Radha.Core` — palette engine, wallpaper decoding, config, IPC protocol, command catalog, security, performance, service contracts | ✅ **built and tested here** | **235 assertions pass, zero failures** |
-| `radha` CLI — palette extraction, command surface, IPC client | ✅ **built and tested here** | runs offline for `scheme extract` |
-| `Radha.App` — WinUI 3 bar / dashboard / launcher / control centre / notifications / OSD / session | 🟡 **written, not compiled** | needs a Windows build pass; see `docs/BUILD.md` |
-| `Radha.Native` — AppBar dock, blur, global hotkeys, VD stubs | 🟡 **written, not compiled** | CMake project for MSVC |
-| `Radha.Shaders` — Blur / Morph / Grain | 🟡 **written, not compiled** | compile with `dxc`, not yet wired into the app |
+| `Radha.Core` — palette engine, wallpaper decoding, config, IPC protocol, command catalog, security, performance, service contracts | ✅ **built + tested** | **235 assertions, 0 failures**; 5 benchmark budgets green |
+| `radha` CLI — palette extraction, command surface, IPC client | ✅ **built + tested** | runs offline for `scheme extract` |
+| `Radha.App` — WinUI 3 bar / dashboard / launcher / control centre / notifications / OSD / session | ✅ **C# compiles against WinUI; XAML audited** | `app-typecheck` (27 files → 150 KB IL) + `xaml-audit` (0 findings). XAML→code generation + MSIX need Windows: tier 3 |
+| `Radha.Native` — AppBar dock, blur, global hotkeys, VD stubs | ✅ **compiled + linked** | 5 files clean under `clang++ -Werror`; `RadhaNative.dll` (PE32+ x86-64) exports all 14 symbols |
+| `Radha.Shaders` — Blur / Morph / Grain | ✅ **compiled** | 3/3 → DXIL via `dxc -T ps_6_0`; not yet wired into the app |
 | Virtual desktop switching | ❌ **not implemented** | needs undocumented `IVirtualDesktopManagerInternal`; deliberately stubbed, not faked |
 | System toast mirroring | ❌ **not implemented** | needs MSIX identity + `userNotificationListener`; local store works |
 | VPN toggling, Bluetooth device list | ❌ **not implemented** | needs stored RAS/VPN profile + device enumeration |
 | **Lock screen** | ❌ **not built — excluded on request** | no credential provider, no lock UI, no auth code in this repo |
+
+### Verification tiers
+
+`Radha.App` is a WinUI 3 project, and one step of its build — `XamlCompiler.exe` turning `.xaml`
+into C# — is a Windows-only binary. Rather than claim "written, not compiled", the repo verifies it
+in three tiers, and CI runs the first two on every push:
+
+| Tier | Where | What it proves |
+|---|---|---|
+| 1 · static XAML audit (`tools/XamlAudit`) | Linux | Every `x:Class` has a code-behind, every `Click=` handler exists, every `StaticResource` key is defined, every `{Binding}` root and deep path resolves to a real member, every `x:Name` is unique, every element type + namespace exists. No `x:Bind` (which would need the real compiler). |
+| 2 · C# type-check (`tools/TypeCheck`) | Linux | All 27 App source files compile against the genuine `Microsoft.WinUI.dll` / WinRT projections from Windows App SDK 1.6, with `InitializeComponent()` and `x:Name` fields generated from the markup. Wrong API names, bad overloads, invalid casts and syntax errors surface here. |
+| 3 · full build (`winui` job) | `windows-latest` | XAML→C# codegen, MSIX packaging, launch. The only tier that can produce a runnable shell. |
+
+Tiers 1 and 2 are not a substitute for tier 3 — they cannot catch a XAML parse error or a runtime
+layout bug (tier 1 already found a typo'd `{Binding}` while tier 2 found 22 compile errors, so they
+are worth running every push).
 
 ### Verified here (Linux, .NET 9)
 

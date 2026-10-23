@@ -349,6 +349,47 @@ jobs:
           if [ -n "$hits" ]; then echo "$hits"; echo "::error::lock-screen code found (out of scope)"; exit 1; fi
           echo "no lock-screen implementation present"
 
+  # ------------------------------------------------------- app typecheck
+  # The WinUI XAML compiler is a Windows-only executable, so a full Radha.App build cannot run
+  # off-Windows. These two jobs close most of that gap on Linux: the XAML is audited statically
+  # (x:Class ⇄ code-behind, handlers, resources, bindings) and every line of App C# is compiled
+  # against the real WinUI/WinRT reference assemblies with XAML-generated members stubbed out.
+  # The windows `winui` job stays the authoritative check (XAML compile + MSIX packaging).
+  xaml-audit:
+    name: xaml · static audit (linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - name: Build auditor
+        run: dotnet build tools/XamlAudit -c Release --nologo
+      - name: Audit XAML against code-behind
+        run: dotnet run --project tools/XamlAudit -c Release --no-build
+
+  app-typecheck:
+    name: app · typecheck against winui (linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - name: Compile every Radha.App .cs against WinUI reference assemblies
+        # Stubs for XAML-generated members are produced by tools/TypeCheck/generate-stubs.py
+        # from the .xaml files during the build; Windows-only PRI/MSIX targets stay disabled.
+        run: >-
+          dotnet build tools/TypeCheck/Radha.App.TypeCheck.csproj
+          -c Release -p:Platform=x64 --nologo
+      - name: Confirm the type-check assembly was produced
+        run: |
+          dll=$(find tools/TypeCheck/bin/Release -name 'Radha.App.TypeCheck.dll' | head -1)
+          test -n "$dll" || { echo "::error::Radha.App did not type-check"; exit 1; }
+          echo "type-checked $(stat -c%s "$dll") bytes of IL from $(find src/Radha.App -name '*.cs' | wc -l) source files"
+
   # --------------------------------------------------------------- winui
   winui:
     name: winui · compile shell (windows)
@@ -450,7 +491,7 @@ jobs:
   # --------------------------------------------------------------- gate
   ci-gate:
     name: ci · all checks
-    needs: [core, invariants, security, performance, docs, winui, native, shaders]
+    needs: [core, invariants, security, performance, docs, xaml-audit, app-typecheck, winui, native, shaders]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -458,8 +499,9 @@ jobs:
         run: |
           results=("${{ needs.core.result }}" "${{ needs.invariants.result }}" \
                    "${{ needs.security.result }}" "${{ needs.performance.result }}" "${{ needs.docs.result }}" \
+                   "${{ needs.xaml-audit.result }}" "${{ needs.app-typecheck.result }}" \
                    "${{ needs.winui.result }}" "${{ needs.native.result }}" "${{ needs.shaders.result }}")
-          echo "core=${results[0]} invariants=${results[1]} security=${results[2]} performance=${results[3]} docs=${results[4]} winui=${results[5]} native=${results[6]} shaders=${results[7]}"
+          echo "core=${results[0]} invariants=${results[1]} security=${results[2]} performance=${results[3]} docs=${results[4]} xaml-audit=${results[5]} app-typecheck=${results[6]} winui=${results[7]} native=${results[8]} shaders=${results[9]}"
           for r in "${results[@]}"; do
             if [ "$r" != "success" ]; then
               echo "::error::a required job did not succeed ($r)"

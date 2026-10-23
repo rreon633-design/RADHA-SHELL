@@ -393,9 +393,9 @@ public sealed class ShellHost : IAsyncDisposable
         var leaf = target.GetType().GetProperty(segments[^1], BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase)
                    ?? throw new ArgumentException($"no config key '{segments[^1]}'");
 
-        var value = leaf.PropertyType switch
+        object? value = leaf.PropertyType switch
         {
-            var t when t == typeof(double) => double.Parse(rawValue, System.Globalization.CultureInfo.InvariantCulture),
+            var t when t == typeof(double) => (object)double.Parse(rawValue, System.Globalization.CultureInfo.InvariantCulture),
             var t when t == typeof(int) => int.Parse(rawValue, System.Globalization.CultureInfo.InvariantCulture),
             var t when t == typeof(bool) => bool.Parse(rawValue),
             var t when t == typeof(string) => rawValue,
