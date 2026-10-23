@@ -145,6 +145,22 @@ jobs:
           if (-not (Test-Path publish/exe/RadhaShell.exe)) { throw "RadhaShell.exe was not produced" }
           Get-Item publish/exe/RadhaShell.exe | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
 
+      # An unpackaged WinUI app loads App.xaml through a file named resources.pri and nothing else.
+      # MSBuild names it after the assembly by default, which produced RadhaShell.pri and a window
+      # that never appeared. This check reads the bundle's own file table: if the name is wrong the
+      # rest of the pipeline is pointless, so it fails here rather than after a 100 MB upload.
+      - name: Verify the bundle carries resources.pri
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path publish/exe/RadhaShell.exe).Path
+          $text = [Text.Encoding]::Latin1.GetString([IO.File]::ReadAllBytes($exe))
+          $hasResourcePri = $text.Contains('resources.pri')
+          $hasWrongPri = $text.Contains('RadhaShell.pri')
+          Write-Host "resources.pri in bundle : $hasResourcePri"
+          Write-Host "RadhaShell.pri in bundle: $hasWrongPri"
+          if (-not $hasResourcePri) { Write-Host '::error::the bundle has no resources.pri, so XAML will not load'; exit 1 }
+          if ($hasWrongPri) { Write-Host '::error::the bundle still carries RadhaShell.pri; ProjectPriFileName is not taking effect'; exit 1 }
+
       # THE GATE. A release that cannot start is worse than no release: run the actual published
       # binary and only continue if it passes its own headless checks.
       - name: Self-test the published executable
@@ -158,6 +174,43 @@ jobs:
           if (-not (Test-Path $out)) { Write-Host "::error::the executable produced no self-test report"; exit 1 }
           if ($proc.ExitCode -ne 0) { Write-Host "::error::the published executable failed its self-test"; exit 1 }
           Get-Content $out
+
+      # THE REAL GATE. --selftest returns before XAML starts, which is why it passed on a build
+      # that could not open a window. This one starts the shell for real: it must build the App,
+      # parse the resource index, create the bar window and report back. A windowless WinExe is
+      # indistinguishable from a crash, so nothing ships until a window exists.
+      - name: Smoke-test a real window
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path publish/exe/RadhaShell.exe).Path
+          $out = Join-Path $env:RUNNER_TEMP 'smoke.json'
+          Write-Host "starting $exe --smoke"
+          $proc = Start-Process -FilePath $exe -ArgumentList '--smoke', '--out', "`"$out`"", '--timeout', '120' -PassThru
+          if (-not $proc.WaitForExit(180000)) {
+            Stop-Process -Id $proc.Id -Force
+            Write-Host '::error::the shell started but never produced a window within 180s'
+          }
+          $code = $proc.ExitCode
+          Write-Host "smoke exited $code"
+          if (Test-Path $out) { Get-Content $out }
+          $log = Join-Path $env:APPDATA 'Radha\logs\startup.log'
+          if (Test-Path $log) { Write-Host '--- startup.log ---'; Get-Content $log -Tail 40 }
+          Get-ChildItem (Join-Path $env:APPDATA 'Radha\logs') -ErrorAction SilentlyContinue |
+            ForEach-Object { Write-Host '::group::' $_.Name; Get-Content $_.FullName; Write-Host '::endgroup::' }
+          if (-not (Test-Path $out)) { Write-Host '::error::the shell produced no smoke report: it exited before the window existed'; exit 1 }
+          if ($code -ne 0) { Write-Host '::error::the shell could not open a window'; exit 1 }
+
+      - name: Upload launch diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: launch-diagnostics
+          path: |
+            ${{ runner.temp }}/*.json
+            ${{ runner.temp }}/*.txt
+            ${{ env.APPDATA }}/Radha/logs
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Upload artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

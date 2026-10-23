@@ -25,6 +25,12 @@
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <Nullable>enable</Nullable>
     <ApplicationIcon>Assets\radha.ico</ApplicationIcon>
+    <!-- An unpackaged WinUI app resolves App.xaml through resources.pri and nothing else: the
+         resource loader looks for that exact file name next to the module. MSBuild instead names
+         the package resource index after $(TargetName), and the target name here is RadhaShell, so
+         the default produced RadhaShell.pri — a file no loader ever opens. The result was a window
+         that never appeared and an exit code nobody saw. See microsoft/microsoft-ui-xaml#10856. -->
+    <ProjectPriFileName>resources.pri</ProjectPriFileName>
     <!-- Program.cs owns Main so the selftest switch can run before any XAML exists.
          (Note for future edits: a double hyphen is not legal inside an XML comment.) -->
     <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
@@ -51,6 +57,13 @@
          nothing. CI still debugs the same code through the normal build configuration. -->
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+
+  <!-- A single-file bundle extracts everything to %TEMP%\.net\... on first launch. WinExe has no
+       console, so anything that goes wrong before the first frame is invisible. These two
+       properties keep the build honest instead of silent. -->
+  <PropertyGroup Condition="'$(RadhaSingleFile)' == 'true'">
+    <SmokeTestTimeoutSeconds Condition="'$(SmokeTestTimeoutSeconds)' == ''">90</SmokeTestTimeoutSeconds>
   </PropertyGroup>
 
   <ItemGroup>

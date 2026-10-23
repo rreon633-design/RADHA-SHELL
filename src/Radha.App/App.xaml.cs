@@ -63,17 +63,31 @@ public partial class App : Application
 
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
-        Ui.Initialize();
-        _host = new ShellHost();
-
         try
         {
+            Ui.Initialize();
+            _host = new ShellHost();
             await _host.StartAsync();
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[radha] boot failed: {ex}");
-            throw;
+            // Rethrowing here reaches nothing: an unpackaged WinExe has no console and the window
+            // that would have shown the error is the thing that failed to build.
+            Program.Fatal("the shell could not start", ex);
+            Environment.Exit(1);
+            return;
+        }
+
+        if (Program.Smoke is { } smoke)
+        {
+            // A window object exists, its XAML tree is built and it was created by the WinUI
+            // compositor: the three things that fail when resources.pri or the Windows App SDK
+            // runtime is missing. Content is checked because a Window with no tree is not a shell.
+            var window = MainWindowInstance;
+            if (window?.Content is null)
+                smoke.Fail("window", new InvalidOperationException("The bar window was created without any content."));
+            else
+                smoke.Pass($"{window.GetType().Name} with content");
         }
     }
 }
