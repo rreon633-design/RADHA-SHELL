@@ -22,8 +22,7 @@
     <!-- PRI/MSIX packaging tasks only exist on Windows and are irrelevant to a type check. -->
     <EnableMsixTooling>false</EnableMsixTooling>
     <EnableCoreMrtTooling>false</EnableCoreMrtTooling>
-    <Win2DWarnNoPlatform>true</Win2DWarnNoPlatform>
-    <Platform Condition="'$(Platform)' == ''">x64</Platform>
+    <Platform>x64</Platform>
     <NoWarn>$(NoWarn);CS8618;CS0169;CS0649;CS0067;CA1416</NoWarn>
   </PropertyGroup>
 

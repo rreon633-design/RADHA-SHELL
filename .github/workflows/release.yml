@@ -44,11 +44,17 @@ jobs:
           dotnet run --project src/Radha.Tests -c Release --no-build
 
       - name: Publish WinUI shell
-        run: >
-          dotnet publish src/Radha.App/Radha.App.csproj
-          -c Release -p:Platform=x64 -r win-x64 --self-contained true
-          -p:WindowsAppSDKSelfContained=true
-          -o publish/app
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'publish.log'
+          dotnet publish src/Radha.App/Radha.App.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained true -p:WindowsAppSDKSelfContained=true -o publish/app -v:q 2>&1 | Tee-Object -FilePath $log
+          $code = $LASTEXITCODE
+          $errs = @(Select-String -Path $log -Pattern ': error ' | ForEach-Object { $_.Line.Trim() } | Select-Object -Unique)
+          $errs | Select-Object -First 15 | ForEach-Object {
+            $m = $_.Replace('%', '%25').Replace([string][char]13, '').Replace([string][char]10, '%0A')
+            Write-Host "::error file=src/Radha.App::$m"
+          }
+          if ($code -ne 0) { Write-Host "::error::publish exited $code with $($errs.Count) error line(s)"; exit $code }
 
       - name: Publish CLI
         run: >

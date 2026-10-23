@@ -386,8 +386,8 @@ jobs:
           -c Release -p:Platform=x64 --nologo
       - name: Confirm the type-check assembly was produced
         run: |
-          dll=$(find tools/TypeCheck/bin/Release -name 'Radha.App.TypeCheck.dll' | head -1)
-          test -n "$dll" || { echo "::error::Radha.App did not type-check"; exit 1; }
+          dll=$(find tools/TypeCheck/bin -name 'Radha.App.TypeCheck.dll' -print -quit)
+          test -n "$dll" || { echo "::error::Radha.App did not type-check (no assembly)"; exit 1; }
           echo "type-checked $(stat -c%s "$dll") bytes of IL from $(find src/Radha.App -name '*.cs' | wc -l) source files"
 
   # --------------------------------------------------------------- winui
@@ -408,11 +408,24 @@ jobs:
       - name: Restore
         run: dotnet restore src/Radha.App/Radha.App.csproj -p:Platform=x64
 
+      # Job logs need repo admin, but ::error annotations are public. Emit every compiler
+      # error as an annotation so failures are diagnosable from outside the repository.
       - name: Build WinUI shell
-        run: >
-          dotnet build src/Radha.App/Radha.App.csproj
-          -c Release -p:Platform=x64 --no-restore
-          -p:TreatWarningsAsErrors=false
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'winui-build.log'
+          dotnet build src/Radha.App/Radha.App.csproj -c Release -p:Platform=x64 --no-restore -p:TreatWarningsAsErrors=false -v:q -clp:NoSummary 2>&1 | Tee-Object -FilePath $log
+          $code = $LASTEXITCODE
+          $errs = @(Select-String -Path $log -Pattern ': error ' | ForEach-Object { $_.Line.Trim() } | Select-Object -Unique)
+          $errs | Select-Object -First 15 | ForEach-Object {
+            $m = $_.Replace('%', '%25').Replace([string][char]13, '').Replace([string][char]10, '%0A')
+            Write-Host "::error file=src/Radha.App::$m"
+          }
+          if ($code -ne 0) {
+            Write-Host "::error::dotnet build exited $code with $($errs.Count) unique compiler error line(s)"
+            exit $code
+          }
+          Write-Host "build clean ($($errs.Count) errors)"
 
       - name: Upload app artifact
         uses: actions/upload-artifact@v4
