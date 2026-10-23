@@ -409,14 +409,30 @@ jobs:
         run: dotnet restore src/Radha.App/Radha.App.csproj -p:Platform=x64
 
       # Job logs need repo admin, but ::error annotations are public. Emit every compiler
-      # error as an annotation so failures are diagnosable from outside the repository.
+      # error as an annotation, and fall back to the XAML compiler's own output.json so a
+      # failure wrapped in MSB3073 still names the offending markup.
       - name: Build WinUI shell
         shell: pwsh
         run: |
           $log = Join-Path $env:RUNNER_TEMP 'winui-build.log'
-          dotnet build src/Radha.App/Radha.App.csproj -c Release -p:Platform=x64 --no-restore -p:TreatWarningsAsErrors=false -v:q -clp:NoSummary 2>&1 | Tee-Object -FilePath $log
+          dotnet build src/Radha.App/Radha.App.csproj -c Release -p:Platform=x64 --no-restore -p:TreatWarningsAsErrors=false -v:n 2>&1 | Tee-Object -FilePath $log
           $code = $LASTEXITCODE
-          $errs = @(Select-String -Path $log -Pattern ': error ' | ForEach-Object { $_.Line.Trim() } | Select-Object -Unique)
+
+          $pat = ': error |XamlCompiler error |error [A-Z]{1,4}[0-9]{3,4}'
+          $errs = @(Select-String -Path $log -Pattern $pat |
+                    ForEach-Object { $_.Line.Trim() } |
+                    Where-Object { $_ -notmatch 'MSB3073' } |
+                    Select-Object -Unique)
+
+          if ($code -ne 0 -and $errs.Count -eq 0) {
+            $oj = Get-ChildItem src/Radha.App/obj -Recurse -Filter output.json -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($oj) {
+              $raw = (Get-Content $oj.FullName -Raw)
+              $errs = @($raw -split ([string][char]10) | Where-Object { $_ -match 'error|Error' } | Select-Object -First 20)
+              if ($errs.Count -eq 0) { $errs = @($raw.Substring(0, [Math]::Min(3000, $raw.Length))) }
+            }
+          }
+
           $errs | Select-Object -First 15 | ForEach-Object {
             $m = $_.Replace('%', '%25').Replace([string][char]13, '').Replace([string][char]10, '%0A')
             Write-Host "::error file=src/Radha.App::$m"
@@ -425,7 +441,7 @@ jobs:
             Write-Host "::error::dotnet build exited $code with $($errs.Count) unique compiler error line(s)"
             exit $code
           }
-          Write-Host "build clean ($($errs.Count) errors)"
+          Write-Host "build clean"
 
       - name: Upload app artifact
         uses: actions/upload-artifact@v4

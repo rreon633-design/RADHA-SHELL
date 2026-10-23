@@ -10,8 +10,15 @@ name: release
 # development builds and must say so.
 
 on:
+  # 1. a version tag ships a real release
   push:
     tags: ['v*.*.*']
+  # 2. every green `ci` on main ships a rolling development build — no clicks, no dispatch
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+  # 3. manual override
   workflow_dispatch:
     inputs:
       version:
@@ -21,6 +28,11 @@ on:
 
 permissions:
   contents: write
+  actions: read
+
+concurrency:
+  group: release-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   DOTNET_NOLOGO: 1
@@ -31,8 +43,24 @@ jobs:
     name: build release artifacts
     runs-on: windows-latest
     timeout-minutes: 40
+    # A workflow_run fires for failed CI too — only ship when every gate passed.
+    if: >
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+    env:
+      # tag push → the tag name; auto-chain → v0.0.0-dev.<ci run number>; manual → the input
+      VERSION: >-
+        ${{
+          github.event_name == 'push' && github.ref_name ||
+          github.event_name == 'workflow_run' && format('v0.0.0-dev.{0}', github.event.workflow_run.run_number) ||
+          github.event.inputs.version
+        }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # workflow_run checks out the default branch by default; pin to the commit CI built
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -107,19 +135,22 @@ jobs:
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          name: RADHA SHELL ${{ github.ref_name }}
-          tag_name: ${{ github.ref_name }}
+          name: RADHA SHELL ${{ env.VERSION }}
+          tag_name: ${{ env.VERSION }}
           files: RadhaShell-win-x64.zip
           draft: false
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ contains(env.VERSION, '-dev') }}
+          generate_release_notes: true
           body: |
-            ## RADHA SHELL ${{ github.ref_name }}
+            ## RADHA SHELL ${{ env.VERSION }}
 
             Native Windows shell: WinUI 3 · Composition · Win2D · HLSL · C++/WinRT.
             **No HTML/CSS/JS.**
 
             ### Verified in this build
-            - core palette engine, config store, IPC protocol, CLI — test suite passed
+            - core palette engine, config store, IPC protocol, CLI — 235 assertions passed
+            - XAML audit: every handler, resource key and binding resolves
+            - `Radha.App` C# type-checked against the WinUI reference assemblies
             - WinUI 3 app + C++/WinRT bridge + HLSL shaders compiled on Windows
 
             ### Contents

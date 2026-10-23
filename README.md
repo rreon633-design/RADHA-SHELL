@@ -21,6 +21,25 @@ Caelestia's shell for Hyprland.
 
 ---
 
+## CI/CD — push to ship, no clicks
+
+Every push to `main` runs the full gate on GitHub, and a green run publishes a rolling
+`v0.0.0-dev.<run>` release automatically. Tagging ships a real version.
+
+```bash
+git push origin main            # → ci runs, then release publishes if green
+git tag v0.2.0 && git push origin v0.2.0   # → non-prerelease build
+tools/push.sh                   # same push, but streams the run's jobs to your terminal
+```
+
+| Workflow | Trigger | Result |
+|---|---|---|
+| `ci` | push → `main`, pull request, manual | 10 jobs + `ci-gate`; red gate blocks shipping |
+| `release` | `workflow_run` of a successful `ci` on `main`, `v*.*.*` tag, manual | `RadhaShell-win-x64.zip` + GitHub Release |
+
+Nothing is dispatched by hand. Details, failure modes and the required repo settings are in
+[`docs/CI-CD.md`](docs/CI-CD.md).
+
 ## Status — what is actually built
 
 Every project is compiled here. Only one step in the whole pipeline is Windows-locked — running
