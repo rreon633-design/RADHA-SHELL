@@ -27,6 +27,22 @@ internal static class WifiScanner
         return WifiScanParser.Parse(output);
     }
 
+    /// <summary>
+    /// Joins a network Windows already has a profile for. Windows refuses to connect to a network
+    /// it has never seen, so the honest contract is "connect using a saved profile" — the first
+    /// join has to come from Settings, exactly as it does for every other Win32 application.
+    /// </summary>
+    public static async Task<bool> ConnectAsync(string profile, CancellationToken ct = default)
+    {
+        if (!OperatingSystem.IsWindows() || string.IsNullOrWhiteSpace(profile)) return false;
+
+        // The profile name goes into a command line: refuse anything that could break out of it.
+        if (profile.Contains('"') || profile.Contains('\\') || profile.Length > 64) return false;
+
+        var output = await RunAsync($"wlan connect name=\"{profile}\"", ct).ConfigureAwait(false);
+        return output.Contains("completed", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static async Task<string> RunAsync(string arguments, CancellationToken ct)
     {
         var info = new ProcessStartInfo("netsh", arguments)

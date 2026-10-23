@@ -4,6 +4,19 @@ All notable changes to RADHA SHELL are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning is
 [SemVer](https://semver.org/).
 
+## Unreleased — polish, policy and supply chain
+
+- `DesignTokens` / `MotionTokens` — spacing, padding, radius, typography, density and reduced-motion
+  in one tested place.
+- `ProfileStore` — named appearance profiles with sanitised names and merge-on-apply.
+- `ShellClock` — one 1 Hz tick for the whole shell, with overrun protection.
+- `LaunchGuard` — allowlist for anything the shell executes or opens; guards notification deep links.
+- Command catalog is now a frozen dictionary (no per-request allocation).
+- CI: actions pinned by SHA, least-privilege permissions, nightly runs, concurrency cancellation,
+  PR title lint, Dependabot, issue templates.
+- Release: build-provenance attestation and a `SHA256SUMS.txt` asset.
+- `docs/adr/` — three decision records.
+
 ## Unreleased — caelestia parity pass
 
 Closes the gaps found in the caelestia-shell comparison (`docs/COMPARISON-CAELESTIA.md`).

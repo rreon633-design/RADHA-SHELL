@@ -188,4 +188,49 @@ public sealed class BluetoothService : IBluetoothService
         if (_linked.Remove(deviceId, out var device)) device.Dispose();
         await RefreshDevicesAsync();
     }
+
+    /// <summary>
+    /// Devices the machine can see but has not paired with. Discovery is a query, not a background
+    /// scan: it only asks the enumeration service what it already knows, which is why it returns in
+    /// milliseconds and needs no capability.
+    /// </summary>
+    public static async Task<IReadOnlyList<(string Id, string Name)>> ScanUnpairedAsync()
+    {
+        if (!OperatingSystem.IsWindows()) return Array.Empty<(string, string)>();
+
+        try
+        {
+            var selector = WinBt.GetDeviceSelector();
+            var found = await DeviceInformation.FindAllAsync(selector);
+
+            return found
+                .Where(d => d.Pairing is { IsPaired: false })
+                .Where(d => !string.IsNullOrWhiteSpace(d.Name))
+                .Select(d => (d.Id, d.Name))
+                .ToList();
+        }
+        catch (Exception)
+        {
+            return Array.Empty<(string, string)>();
+        }
+    }
+
+    /// <summary>Prompts the user (Windows shows the pairing UI) for an unpaired device id.</summary>
+    public static async Task<bool> PairAsync(string deviceId)
+    {
+        if (!OperatingSystem.IsWindows() || string.IsNullOrWhiteSpace(deviceId)) return false;
+
+        try
+        {
+            var device = await DeviceInformation.CreateFromIdAsync(deviceId);
+            if (device is null) return false;
+
+            var result = await device.Pairing.PairAsync();
+            return result.Status is DevicePairingResultStatus.Paired or DevicePairingResultStatus.AlreadyPaired;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
 }

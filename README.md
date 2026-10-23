@@ -64,6 +64,8 @@ Every project is compiled here. Only one step in the whole pipeline is Windows-l
 | Config hot-reload | ✅ **implemented** | debounced `FileSystemWatcher`; a half-written file is rejected, a settled one is adopted live |
 | Battery warnings + idle inhibit | ✅ **implemented** | threshold state machine with hysteresis; `SetThreadExecutionState` while media plays (never locks the session) |
 | Wi-Fi network list | ✅ **implemented** | `netsh wlan show networks` parsed by a unit-tested parser — no restricted capability needed |
+| Design tokens + appearance profiles | ✅ **implemented** | `DesignTokens`/`MotionTokens` (spacing, padding, radius, typography, density, reduced motion) and `ProfileStore` — both unit-tested |
+| Launch guard | ✅ **implemented** | allowlist + traversal/UNC rejection for anything the shell executes or opens, including notification deep links |
 | **Lock screen** | ❌ **not built — excluded on request** | no credential provider, no lock UI, no auth code in this repo |
 
 ### What the shell does not do yet

@@ -73,7 +73,12 @@ public sealed partial class ShellState : ObservableObject
         {
             Notifications.Clear();
             HasNotifications = false;
+            foreach (var item in _notifications.History)
+                Notifications.Add(new NotificationItemVm(item, Theme));
+            HasNotifications = Notifications.Count > 0;
+            RecomputedNotificationHeaders();
         };
+
         _workspaces.Changed += (_, _) => SyncWorkspaces();
 
         SyncMedia();
@@ -201,14 +206,19 @@ public sealed partial class ShellState : ObservableObject
     /// provided one; everything else dismisses, because acting inside another app's notification
     /// is not something an unpackaged shell is allowed to do.
     /// </summary>
+    private static readonly string[] DeepLinkAllowlist = { "https:", "http:", "ms-settings:", "ms-", "mailto:" };
+
     public void RunNotificationAction(NotificationItemVm item, string action)
     {
         if (action is "open" or "Open")
         {
             var link = item.Notification.DeepLink;
+
+            // A deep link comes from another application's toast: treat it as untrusted input and
+            // pass it through the same allowlist that guards config-named executables.
             if (!string.IsNullOrWhiteSpace(link) &&
-                Uri.TryCreate(link, UriKind.Absolute, out var uri) &&
-                (uri.Scheme is "http" or "https" or "ms-settings" or "mailto"))
+                LaunchGuard.IsAllowed(link, DeepLinkAllowlist, out _) &&
+                Uri.TryCreate(link, UriKind.Absolute, out var uri))
             {
                 _ = Windows.System.Launcher.LaunchUriAsync(uri);
                 return;
@@ -287,6 +297,21 @@ public sealed partial class ShellState : ObservableObject
     {
         Notifications.Insert(0, new NotificationItemVm(notification, Theme));
         HasNotifications = true;
+        RecomputedNotificationHeaders();
+    }
+
+    /// <summary>
+    /// Marks the first row of each app run so the list reads as groups without needing a grouped
+    /// CollectionViewSource (which cannot be expressed without the Windows XAML compiler).
+    /// </summary>
+    private void RecomputedNotificationHeaders()
+    {
+        string? previous = null;
+        foreach (var item in Notifications)
+        {
+            item.ShowAppHeader = !string.Equals(previous, item.AppName, StringComparison.OrdinalIgnoreCase);
+            previous = item.AppName;
+        }
     }
 
     private void ClosePanels() =>
@@ -320,6 +345,9 @@ public sealed partial class NotificationItemVm : ObservableObject
     [ObservableProperty] private SolidColorBrush _cardBrush = new(Microsoft.UI.Colors.Transparent);
     [ObservableProperty] private SolidColorBrush _accentBrush = new(Microsoft.UI.Colors.MediumPurple);
     [ObservableProperty] private SolidColorBrush _appNameBrush = new(Microsoft.UI.Colors.Gray);
+
+    /// <summary>First row of an app run; the template prints the app name above it.</summary>
+    [ObservableProperty] private bool _showAppHeader;
 
     public NotificationItemVm(ShellNotification notification, ThemeViewModel theme)
     {

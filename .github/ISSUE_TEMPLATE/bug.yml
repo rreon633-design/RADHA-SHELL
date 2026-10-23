@@ -1,0 +1,49 @@
+name: Bug report
+description: Something in the shell misbehaves
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Attach a diagnostics bundle if you can: **Settings → Config health → Diagnostics bundle**,
+        or `radha config diagnostics`. It contains your config, logs and environment — all redacted.
+  - type: input
+    id: build
+    attributes:
+      label: Build
+      description: Release tag or commit the shell reports
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Windows build
+      description: e.g. Windows 11 26100.2314
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Bar
+        - Dashboard
+        - Launcher
+        - Control centre
+        - Notifications
+        - Virtual desktops
+        - VPN / Bluetooth
+        - Config / settings
+        - Build / CI

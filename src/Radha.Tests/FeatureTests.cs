@@ -9,6 +9,8 @@ using Radha.Core.Net;
 using Radha.Core.Notifications;
 using Radha.Core.Performance;
 using Radha.Core.Power;
+using Radha.Core.Security;
+using Radha.Core.Theming;
 using Radha.Core.Services;
 using Radha.Core.Updates;
 
@@ -34,6 +36,141 @@ public static class FeatureTests
         UpdateTests(check);
         SeriesTests(check);
         DiagnosticsTests(check);
+        TokenTests(check);
+        ProfileTests(check);
+        ClockTests(check);
+        LaunchGuardTests(check);
+    }
+
+    // ---------------- design tokens ----------------
+
+    private static void TokenTests(Action<string, bool> check)
+    {
+        var tokens = DesignTokens.Default;
+        check("tokens: spacing is ordered", tokens.SpacingXs < tokens.SpacingSm && tokens.SpacingSm < tokens.SpacingMd);
+        check("tokens: radius is ordered", tokens.RadiusXs < tokens.RadiusSm && tokens.RadiusSm < tokens.RadiusLg);
+        check("tokens: typography is ordered", tokens.FontCaption < tokens.FontBody && tokens.FontBody < tokens.FontHeading);
+        check("tokens: minimum hit target", tokens.MinHitTarget >= 28);
+
+        var dense = DesignTokens.Default with { Density = Density.Compact };
+        check("tokens: compact shrinks spacing", dense.SpacingMd < tokens.SpacingMd);
+        check("tokens: compact shrinks hit target", dense.MinHitTarget < tokens.MinHitTarget);
+
+        var scaled = DesignTokens.Default with { Scale = 1.5 };
+        check("tokens: scale multiplies", Math.Abs(scaled.SpacingMd - tokens.SpacingMd * 1.5) < 0.01);
+
+        var bad = DesignTokens.Default with { Scale = double.NaN, FontScale = 99 };
+        var fixedTokens = bad.Normalized();
+        check("tokens: NaN scale normalised", fixedTokens.Scale == 0.5);
+        check("tokens: font scale clamped", fixedTokens.FontScale == 3);
+
+        var motion = MotionTokens.Default;
+        check("motion: durations ordered", motion.Fast < motion.Normal && motion.Normal < motion.Slow);
+        check("motion: scale multiplies", Math.Abs((MotionTokens.Default with { Scale = 2 }).Normal.TotalMilliseconds - 400) < 1);
+        check("motion: reduced motion zeroes durations", MotionTokens.Default with { Reduced = true } is { } r &&
+                                                            r.Fast == TimeSpan.Zero && r.PageTransition == TimeSpan.Zero);
+        check("motion: zero scale zeroes durations", (MotionTokens.Default with { Scale = 0 }).Slow == TimeSpan.Zero);
+    }
+
+    // ---------------- appearance profiles ----------------
+
+    private static void ProfileTests(Action<string, bool> check)
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "radha-profiles-" + Guid.NewGuid().ToString("N")[..8]);
+        try
+        {
+            var store = new ProfileStore(dir);
+            check("profile: empty store", store.List().Count == 0);
+
+            var config = new ShellConfig();
+            config.Appearance.Mode = "dark";
+            config.Bar.Height = 55;
+
+            var saved = store.SaveFrom("Work", config);
+            check("profile: name sanitised", saved.Name == "Work");
+            check("profile: file written", store.PathFor("Work") is var p && File.Exists(p));
+
+            var loaded = store.List();
+            check("profile: listed", loaded.Count == 1);
+            check("profile: carries appearance", loaded[0].Json.Contains("appearance", StringComparison.Ordinal));
+            check("profile: omits services", !loaded[0].Json.Contains("services", StringComparison.Ordinal));
+
+            var target = new ShellConfig();
+            target.Bar.Height = 30;
+            var applied = store.Get("work")!.ApplyTo(target);
+            check("profile: applies stored value", applied.Bar.Height == 55);
+            check("profile: keeps unrelated values", applied.Appearance.Mode == "dark");
+
+            check("profile: delete", store.Delete("Work") && store.List().Count == 0);
+            check("profile: delete missing", !store.Delete("nope"));
+
+            check("profile: traversal sanitised", !ProfileStore.Sanitize("../../etc/passwd").Contains('/'));
+            check("profile: sanitised name resolves inside", store.PathFor("../../evil").StartsWith(Path.GetFullPath(dir), StringComparison.Ordinal));
+
+            var corrupt = new AppearanceProfile("bad", "{ not json", DateTimeOffset.Now);
+            check("profile: corrupt profile ignored", ReferenceEquals(corrupt.ApplyTo(config), config) ||
+                                                        corrupt.ApplyTo(config).Bar.Height == config.Bar.Height);
+        }
+        finally
+        {
+            try { Directory.Delete(dir, true); } catch { }
+        }
+    }
+
+    // ---------------- shell clock ----------------
+
+    private static void ClockTests(Action<string, bool> check)
+    {
+        using var clock = new ShellClock(TimeSpan.FromMilliseconds(25));
+        var ticks = 0;
+        clock.Tick += _ => Interlocked.Increment(ref ticks);
+
+        check("clock: subscriber counted", clock.SubscriberCount == 1);
+        check("clock: not running initially", !clock.IsRunning);
+
+        clock.Start();
+        check("clock: running after start", clock.IsRunning);
+        Thread.Sleep(120);
+        clock.Stop();
+
+        var observed = Volatile.Read(ref ticks);
+        check("clock: ticks fire", observed >= 2);
+        check("clock: counter matches", clock.Ticks >= 2);
+
+        using var manual = new ShellClock();
+        var manualTicks = 0;
+        manual.Tick += _ => manualTicks++;
+        manual.Pulse();
+        manual.Pulse();
+        check("clock: pulse runs handlers", manualTicks == 2);
+
+        using var bad = new ShellClock();
+        bad.Tick += _ => throw new InvalidOperationException("boom");
+        var survived = 0;
+        bad.Tick += _ => survived++;
+        bad.Pulse();
+        check("clock: a throwing subscriber does not stop others", survived == 1);
+    }
+
+    // ---------------- launch guard ----------------
+
+    private static void LaunchGuardTests(Action<string, bool> check)
+    {
+        check("guard: allowlisted exe", LaunchGuard.IsAllowed("wt.exe", LaunchGuard.DefaultAllowlist, out _));
+        check("guard: allowlisted with path", LaunchGuard.IsAllowed(@"C:\Windows\System32\notepad.exe", null, out _) ||
+                                              LaunchGuard.IsAllowed("/usr/bin/notepad.exe", null, out _) is false);
+        check("guard: traversal rejected", !LaunchGuard.IsAllowed(@"..\..\evil.exe", null, out var traversal) &&
+                                           traversal.Contains("traversal", StringComparison.Ordinal));
+        check("guard: unc rejected", !LaunchGuard.IsAllowed(@"\\server\share\evil.exe", null, out _));
+        check("guard: unknown binary rejected", !LaunchGuard.IsAllowed("definitely-not-allowed.exe", null, out var unknown) &&
+                                                unknown.Contains("allowlist", StringComparison.Ordinal));
+        check("guard: empty rejected", !LaunchGuard.IsAllowed("", null, out _));
+        check("guard: uri scheme allowed", LaunchGuard.IsAllowed("ms-settings:display", null, out _));
+        check("guard: arbitrary scheme rejected", !LaunchGuard.IsAllowed("javascript:alert(1)", null, out _));
+        check("guard: drive path is not a scheme", LaunchGuard.IsAllowed(@"C:\Windows\System32\notepad.exe", null, out var drive) ||
+                                                   drive.Contains("not exist", StringComparison.Ordinal));
+        check("guard: custom allowlist honoured", LaunchGuard.IsAllowed("my-tool.exe", new[] { "my-tool.exe" }, out _));
+        check("guard: custom allowlist excludes others", !LaunchGuard.IsAllowed("cmd.exe", new[] { "my-tool.exe" }, out _));
     }
 
     // ---------------- calculator ----------------

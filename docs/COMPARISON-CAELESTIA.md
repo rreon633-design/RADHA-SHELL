@@ -98,9 +98,9 @@ Legend: **✅ parity** · **⚠️ partial** · **❌ not implemented** · **—
 | Crash reports / issue templates | ⚠️ | redacted diagnostics bundle (config, logs, environment); no automatic crash handler |
 | Release automation | ✅ | CI + auto-CD release on every green `main` |
 
-**Score after this batch:** of ~55 comparable surfaces and services, **29 are at parity, 13 partial,
-12 missing**, and 1 (lock screen) is excluded deliberately. Parity moved by 11 in one pass; what
-remains missing is almost entirely capture, previews, shader transitions and plugin surface.
+**Score after the second batch:** of ~55 comparable surfaces and services, **32 are at parity, 12
+partial, 10 missing**, and 1 (lock screen) is excluded deliberately. What remains missing is almost
+entirely capture, previews, shader transitions and plugin surface.
 
 ---
 
@@ -158,10 +158,9 @@ LibreHardwareMonitor instance held open, palette extraction on demand.
 - **Event-driven instead of polling.** `NetworkListManager` COM events for connectivity,
   `PowerManager` events for battery/AC, `SystemEvents.SessionSwitch` — replace the 4 s VPN poll with
   a read only while a tunnel is up.
-- **One clock.** A single 1 Hz tick in Core that all widgets subscribe to, with coalesced
-  invalidation; today each viewmodel ticks itself.
-- **Allocation discipline.** `FrozenDictionary` for the command catalog and config lookups,
-  `ArrayPool<byte>` in the IPC frame reader, `StringComparison.Ordinal`, `ValueTask` on hot paths.
+- **One clock.** ✅ `ShellClock` — one timer, overrun protection, per-subscriber exception isolation.
+- **Allocation discipline.** ✅ the command catalog is a `FrozenDictionary<ShellModule, FrozenSet<string>>`;
+  `Series` history is allocation-free. `ArrayPool` in the IPC reader is still open.
 - **`LibraryImport`** (source-generated marshalling) for the P/Invoke surface instead of
   `DllImport` — removes the IL stub and the marshaller allocation per call.
 - **Publish profile**: `PublishReadyToRun`, `TieredPGO`, `ServerGarbageCollection=false`,
@@ -188,11 +187,11 @@ LibreHardwareMonitor instance held open, palette extraction on demand.
 
 ### 4.3 Personalization
 
-- **A real token layer.** caelestia exposes rounding, spacing, padding and font *scales*, each with
-  9 steps. We have rounding and font scale; add spacing/padding and make every view read tokens
-  instead of literals.
-- **Appearance profiles.** Named bundles (`work`, `gaming`, `dim`) that swap scheme, wallpaper and
-  bar layout atomically, import/exportable as JSON.
+- **A real token layer.** ✅ `DesignTokens` (spacing, padding, radius, typography, density) and
+  `MotionTokens` (durations, curves, reduced-motion) live in Core and are unit-tested. Views still
+  read literals; adopting the tokens is per-view work, not a design question any more.
+- **Appearance profiles.** ✅ `ProfileStore` with sanitised names, size caps and merge-on-apply;
+  a corrupt profile cannot take the live config with it.
 - **Per-monitor identity.** Wallpaper, scale and bar segments per display — the single biggest
   missing personalization axis on Windows.
 - **Bar composition.** Ordered, drag-reorderable segments (clock, workspaces, media, tray, status),
@@ -221,10 +220,10 @@ LibreHardwareMonitor instance held open, palette extraction on demand.
 Already good: current-user-only IPC, token-bucket limiter, redacted audit log, input guard, fixture
 secrets scan, no credentials in the repo. Remaining work, in leverage order:
 
-- **Pin actions by commit SHA**, not `@v4`; add `permissions: contents: read` at workflow level and
-  elevate per job. A compromised tag is the most common supply-chain entry point.
-- **OIDC + provenance**: drop long-lived secrets, use `actions/attest-build-provenance` on release
-  artifacts, publish a SHA-256 manifest alongside the zip.
+- **Pin actions by commit SHA.** ✅ all four actions are pinned; `permissions: contents: read` is the
+  workflow default and only the release job escalates (`contents`/`id-token`/`attestations`).
+- **OIDC + provenance.** ✅ `attest-build-provenance` on the release zip, plus a `SHA256SUMS.txt`
+  asset written by the same job.
 - **Sign the binaries** (Authenticode; Azure Trusted Signing or SignPath) — an unsigned shell that
   asks for autostart and IPC privileges will be flagged by every EDR product.
 - **SBOM** (`dotnet CycloneDX`) + `packages.lock.json` with `RestoreLockedMode` in CI.
@@ -235,8 +234,8 @@ secrets scan, no credentials in the repo. Remaining work, in leverage order:
   undocumented COM vtables are exactly where a bad pointer turns into memory corruption.
 - **IPC**: cap frame size *before* allocating, verify the client image if a privileged command is
   requested, and keep the protocol fuzz target in CI.
-- **Config as attack surface**: config can name an executable to launch (terminal, explorer). Resolve
-  through an allowlist, refuse `..` and UNC paths, and check the file isn't world-writable.
+- **Config as attack surface.** ✅ `LaunchGuard`: allowlist, traversal and UNC rejection, drive-letter
+  vs URI disambiguation, and it now guards notification deep links too.
 
 ### 4.6 Maintenance
 
@@ -251,26 +250,24 @@ secrets scan, no credentials in the repo. Remaining work, in leverage order:
 - **Coverage floor + mutation testing** on `Radha.Core` (Stryker). 255 assertions is a good start;
   a coverage threshold stops it from silently decaying.
 - **Deprecation policy**: config keys get a one-release warning window, documented in the changelog.
-- **ADRs** for decisions that keep coming back (why RAS instead of `Windows.Networking.Vpn`, why no
-  vtable hard-coding). We have the analysis — it belongs in `docs/adr/`, not only in commit bodies.
-- **Triage hygiene**: issue templates (bug/feature/crash), labels, "good first issue", a stale bot.
+- **ADRs.** ✅ `docs/adr/` — RAS over WinRT VPN, version-dispatched COM, and what CI is allowed to claim.
+- **Triage hygiene.** ✅ bug report template with a diagnostics-bundle prompt, PR template with the
+  local gates, Dependabot grouped by ecosystem.
 
 ### 4.7 Workflow automation
 
 - **Conventional Commits → changelog → release notes**, with the bump derived from commit types
   (`feat!` → major, `feat` → minor, `fix` → patch) instead of a run number.
-- **PR gates**: title lint (they have it, we don't), auto-label by path, `concurrency:
-  cancel-in-progress` per branch, `fail-fast: false` on matrices.
+- **PR gates.** ✅ conventional-commit title lint, `concurrency: cancel-in-progress` on every workflow.
 - **Windows VM smoke test on a real desktop session.** This is the honest fix for the current
   limitation: hosted runners are session 0, so `XamlCompiler`/shell behaviours can't be exercised.
   A self-hosted runner (or a scheduled Azure VM with an interactive session) running the built app
   would have caught `UniformGrid` and `LetterSpacing` before CI did.
 - **Artifact attestation + checksums** on every release, and a **winget manifest PR** opened
   automatically after a stable tag.
-- **Nightly scheduled run** (not just push-triggered) to catch upstream breakage — WinAppSDK and
-  Windows SDK ship frequently; a green build today can be red tomorrow with no code change.
-- **Dependency automation**: Renovate/Dependabot grouped by ecosystem (Actions, NuGet, WinAppSDK),
-  auto-merge patch-level after CI.
+- **Nightly scheduled run.** ✅ `ci` at 03:23 and `release` at 04:17 UTC every day.
+- **Dependency automation.** ✅ Dependabot, weekly, grouped (WinAppSDK+BuildTools together — they must
+  move in lockstep or `NU1605` returns).
 - **Preview builds from PRs**: downloadable artifact + a comment bot linking it. Makes review real.
 
 ---

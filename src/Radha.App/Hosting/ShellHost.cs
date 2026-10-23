@@ -401,9 +401,28 @@ public sealed class ShellHost : IAsyncDisposable
 
             case ShellModule.Bluetooth:
                 if (command == "toggle") { _ = _bluetooth.ToggleAsync(); return "ok"; }
+                if (command == "scan")
+                {
+                    var found = BluetoothService.ScanUnpairedAsync().GetAwaiter().GetResult();
+                    return JsonSerializer.Serialize(found.Select(d => new { name = d.Name, id = d.Id }));
+                }
+                if (command == "pair")
+                {
+                    if (args.Length == 0) return "usage: radha bluetooth pair <device-id>";
+                    return BluetoothService.PairAsync(args[0]).GetAwaiter().GetResult()
+                        ? "paired"
+                        : "pairing failed or was cancelled";
+                }
                 return JsonSerializer.Serialize(new { enabled = _bluetooth.Enabled, devices = _bluetooth.Devices.Count });
 
             case ShellModule.Network:
+                if (command == "wifi-connect")
+                {
+                    if (args.Length == 0) return "usage: radha network wifi-connect <profile>";
+                    return WifiScanner.ConnectAsync(args[0]).GetAwaiter().GetResult()
+                        ? "connected to " + args[0]
+                        : "no saved profile named " + args[0] + " (Windows needs a profile; join it once from Settings)";
+                }
                 if (command == "wifi-list")
                 {
                     var networks = WifiScanner.ScanAsync().GetAwaiter().GetResult();
@@ -642,8 +661,11 @@ public sealed class ShellHost : IAsyncDisposable
                 UserInhibited: false);
 
             var decision = IdlePolicy.Evaluate(inputs, IdleConfig.Default);
-            var want = decision.InhibitDisplay;
 
+            if (decision.Action == IdleAction.TurnOffDisplay && !_idleInhibited)
+                IdleClock.TurnOffDisplay();
+
+            var want = decision.InhibitDisplay;
             if (want == _idleInhibited) return;
             _idleInhibited = want;
             IdleClock.SetInhibit(want);

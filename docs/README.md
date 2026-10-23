@@ -64,3 +64,9 @@ Deciding whether to adopt it: **21 → 8 → 19 → 23**.
 
 - [`VIRTUAL-DESKTOPS.md`](VIRTUAL-DESKTOPS.md) — per-build COM dispatch for desktop switching
 - [`COMPARISON-CAELESTIA.md`](COMPARISON-CAELESTIA.md) — feature-by-feature comparison with caelestia-shell, gap register and improvement plan
+
+## Architecture decision records
+
+- [0001 — VPN through RAS, not WinRT](adr/0001-ras-instead-of-winrt-vpn.md)
+- [0002 — version-dispatched COM](adr/0002-version-dispatched-com.md)
+- [0003 — what CI is allowed to claim](adr/0003-ci-cannot-see-the-desktop.md)

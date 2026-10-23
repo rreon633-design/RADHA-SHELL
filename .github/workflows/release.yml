@@ -10,6 +10,9 @@ name: release
 # development builds and must say so.
 
 on:
+  # 0. nightly safety net: a green build today can go red with no code change
+  schedule:
+    - cron: '17 4 * * *'
   # 1. a version tag ships a real release
   push:
     tags: ['v*.*.*']
@@ -40,6 +43,11 @@ env:
 
 jobs:
   build:
+    # The only job that needs to write: it creates the release and attests the artifact.
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     name: build release artifacts
     runs-on: windows-latest
     timeout-minutes: 40
@@ -58,13 +66,13 @@ jobs:
           github.event.inputs.version
         }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # workflow_run checks out the default branch by default; pin to the commit CI built
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: 9.0.x
 
@@ -146,18 +154,33 @@ jobs:
         run: Compress-Archive -Path publish/app/*, publish/cli/* -DestinationPath RadhaShell-win-x64.zip
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: RadhaShell-win-x64
           path: RadhaShell-win-x64.zip
           retention-days: 30
 
       - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
+        name: Attest the artifact
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: RadhaShell-win-x64.zip
+
+      - name: Write checksums
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash RadhaShell-win-x64.zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  RadhaShell-win-x64.zip" | Out-File -Encoding ascii SHA256SUMS.txt
+          Get-Content SHA256SUMS.txt
+
+      - name: Publish release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           name: RADHA SHELL ${{ env.RELEASE_VERSION }}
           tag_name: ${{ env.RELEASE_VERSION }}
-          files: RadhaShell-win-x64.zip
+          files: |
+            RadhaShell-win-x64.zip
+            SHA256SUMS.txt
           draft: false
           prerelease: ${{ contains(env.RELEASE_VERSION, '-dev') }}
           generate_release_notes: true

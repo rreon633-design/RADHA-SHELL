@@ -1,0 +1,37 @@
+name: pr
+
+# Hygiene that only applies to pull requests: a conventional commit title, so the changelog and
+# the semver bump can be derived from history instead of guessed at release time.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  title:
+    name: pr · title lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Conventional commit title
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          python3 - <<'PY'
+          import os, re, sys
+          title = os.environ.get("TITLE", "").strip()
+          pattern = r"^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9./-]+\))?!?: .{3,}"
+          if not re.match(pattern, title):
+              print(f"::error::PR title must be a conventional commit, e.g. 'fix(ipc): reject oversized frames'")
+              print(f"           got: {title!r}")
+              sys.exit(1)
+          print(f"ok: {title}")
+          PY

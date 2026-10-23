@@ -1,8 +1,8 @@
 using System.Collections.ObjectModel;
-using System.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Xaml.Media;
+using Radha.Core.Launcher;
 using Radha.Core.Search;
 using Radha.Core.Services;
 
@@ -387,16 +387,11 @@ public sealed partial class LauncherViewModel : ObservableObject
             return;
         }
 
-        // Live calculator: anything that looks like arithmetic.
-        if (query.Any(char.IsDigit) && query.Any(c => "+-*/^%(".Contains(c)))
-        {
-            try
-            {
-                var result = new DataTable().Compute(query.Replace("×", "*").Replace("÷", "/").Replace("^", "^^"), null);
-                Calculation = $"{result}";
-            }
-            catch { /* not valid arithmetic */ }
-        }
+        // Live calculator. Radha.Core owns the parser: DataTable.Compute needed "^^" for power and
+        // silently disagreed with ^ on everything else.
+        var expression = query.Replace("×", "*").Replace("÷", "/");
+        if (Calculator.LooksLikeExpression(expression) && Calculator.TryEvaluate(expression, out var value))
+            Calculation = Calculator.Format(value);
 
         SetResults(Score(query).Take(12));
     }

@@ -29,6 +29,21 @@ internal static class IdleClock
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern uint SetThreadExecutionState(uint flags);
 
+    private const uint WmSysCommand = 0x0112;
+    private const int ScMonitorPower = 0xF170;
+    private static readonly IntPtr HwndBroadcast = new(0xffff);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr SendMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
+
+    /// <summary>Powers the display down without locking the session — the documented WM_SYSCOMMAND path.</summary>
+    public static bool TurnOffDisplay()
+    {
+        if (!OperatingSystem.IsWindows()) return false;
+        SendMessage(HwndBroadcast, WmSysCommand, (IntPtr)ScMonitorPower, (IntPtr)2);
+        return true;
+    }
+
     /// <summary>Time since the last keyboard or mouse input.</summary>
     public static TimeSpan IdleFor()
     {

@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security disclosure
+    url: https://github.com/rreon633-design/RADHA-SHELL/blob/main/SECURITY.md
+    about: Please report vulnerabilities privately, not as a public issue.
