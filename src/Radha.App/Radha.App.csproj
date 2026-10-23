@@ -8,7 +8,9 @@
     <TargetFramework>net9.0-windows10.0.19041.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
     <RootNamespace>Radha.App</RootNamespace>
-    <AssemblyName>Radha.App</AssemblyName>
+    <!-- The shipped file is RadhaShell.exe: one executable a user can double-click. The namespace
+         stays Radha.App, and the packaged alias in Package.appxmanifest matches. -->
+    <AssemblyName>RadhaShell</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <UseWinUI>true</UseWinUI>
     <WindowsPackageType>None</WindowsPackageType>
@@ -23,6 +25,22 @@
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <Nullable>enable</Nullable>
     <ApplicationIcon>Assets\radha.ico</ApplicationIcon>
+    <!-- Program.cs owns Main so --selftest can run before any XAML exists. -->
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+  </PropertyGroup>
+
+  <!-- Single-file distribution: dotnet publish -p:RadhaSingleFile=true
+       Not the default, because a single-file WinUI bundle is ~200 MB and local iteration should not
+       pay for extracting it on every launch. -->
+  <PropertyGroup Condition="'$(RadhaSingleFile)' == 'true'">
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <!-- WinRT activation resolves paths, so content is extracted rather than read from the bundle. -->
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+    <DebugType>embedded</DebugType>
+    <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
 
   <ItemGroup>
@@ -42,6 +60,14 @@
 
   <ItemGroup>
     <Content Include="Assets\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- The C++ bridge is built by CMake and dropped here before publish, so the single-file bundle
+       carries it. Absent on a machine without the native toolchain: the managed side then degrades
+       to its labelled fallbacks instead of failing to build. -->
+  <ItemGroup Condition="Exists('native\RadhaNative.dll')">
+    <None Include="native\RadhaNative.dll" Link="RadhaNative.dll"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

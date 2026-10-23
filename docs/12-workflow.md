@@ -3,7 +3,7 @@
 ## 12.1 Cold start
 
 ```
-Radha.App.exe
+RadhaShell.exe
   ├─ App.OnLaunched → Ui.Initialize() (DispatcherQueue)
   ├─ ShellHost ctor
   │    ├─ ConfigStore.Load()            → defaults if missing; .broken backup if corrupt

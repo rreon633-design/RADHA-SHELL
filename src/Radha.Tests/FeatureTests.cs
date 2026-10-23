@@ -44,6 +44,7 @@ public static class FeatureTests
         WallpaperTests(check);
         PowerAndConfirmTests(check);
         CrashReportTests(check);
+        SelfTestTests(check);
     }
 
     // ---------------- design tokens ----------------
@@ -856,5 +857,28 @@ public static class FeatureTests
         {
             try { Directory.Delete(dir, true); } catch { }
         }
+    }
+
+    // ---------------- published-binary self-test ----------------
+
+    private static void SelfTestTests(Action<string, bool> check)
+    {
+        var report = SelfTest.Run();
+        check("selftest: passes on this host", report.Passed);
+        check("selftest: has checks", report.Checks.Count >= 8);
+        check("selftest: no failures", report.Failures == 0);
+        check("selftest: runtime check present", report.Checks.Any(c => c.Name == "runtime"));
+        check("selftest: windows sdk skipped without a probe", report.Checks.Any(c => c.Name == "windows app sdk" && c.Skipped));
+        check("selftest: text names the result", report.ToText().Contains("PASS", StringComparison.Ordinal));
+        check("selftest: json parses", System.Text.Json.JsonDocument.Parse(report.ToJson()).RootElement.TryGetProperty("passed", out _));
+
+        var broken = SelfTest.Run(() => "Microsoft.WinUI.dll missing");
+        check("selftest: a bad runtime probe fails the run", !broken.Passed && broken.Failures == 1);
+
+        var throwing = SelfTest.Run(() => throw new InvalidOperationException("no runtime"));
+        check("selftest: a throwing probe is a failure, not a crash", !throwing.Passed);
+
+        var good = SelfTest.Run(() => null);
+        check("selftest: a clean probe passes", good.Passed);
     }
 }

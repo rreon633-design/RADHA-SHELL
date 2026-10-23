@@ -61,7 +61,7 @@ dxc -T ps_6_0 -E main src\Radha.Shaders\Blur.hlsl -Fo assets\Blur.cso
 
 ## 13.4 First run
 
-1. `Radha.App.exe` → the bar appears at the top of the primary display.
+1. `RadhaShell.exe` → the bar appears at the top of the primary display.
 2. Add `radha.exe` to `PATH` (it ships in the same release archive).
 3. Try:
    ```powershell
@@ -99,7 +99,7 @@ Phase 3 ships a proper startup task through the MSIX package.
 
 ## 13.7 Uninstall
 
-1. Kill `Radha.App.exe`.
+1. Kill `RadhaShell.exe`.
 2. Delete the extracted folder.
 3. Delete `%APPDATA%\Radha` (config, cache, logs).
 4. Remove the `shell:startup` shortcut.
@@ -110,7 +110,7 @@ No registry keys, services or drivers are installed.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `radha` says "not running" | daemon not started | run `Radha.App.exe` |
+| `radha` says "not running" | daemon not started | run `RadhaShell.exe` |
 | `windows` CI job red | XAML/SDK drift | read the job log; the core still works |
 | Bar overlaps maximised windows | app bar not registered | ensure `RadhaNative.dll` is beside the exe |
 | No transparency | battery saver / transparency effects off | Settings → Personalisation → Colours |

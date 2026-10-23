@@ -33,13 +33,13 @@
   </Resources>
 
   <Applications>
-    <Application Id="RadhaShell" Executable="Radha.App.exe" EntryPoint="Windows.FullTrustApplication">
+    <Application Id="RadhaShell" Executable="RadhaShell.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements DisplayName="RADHA SHELL" Description="Native Windows shell"
                           BackgroundColor="transparent"
                           Square150x150Logo="Assets\Square150x150Logo.png"
                           Square44x44Logo="Assets\Square44x44Logo.png" />
       <Extensions>
-        <uap:Extension Category="windows.appExecutionAlias" Executable="Radha.App.exe" EntryPoint="Windows.FullTrustApplication">
+        <uap:Extension Category="windows.appExecutionAlias" Executable="RadhaShell.exe" EntryPoint="Windows.FullTrustApplication">
           <uap:AppExecutionAlias>
             <uap:ExecutionAlias Alias="radha-shell.exe" />
           </uap:AppExecutionAlias>

@@ -100,7 +100,7 @@ dotnet restore src/Radha.App/Radha.App.csproj
 dotnet build src/Radha.App/Radha.App.csproj -c Release -p:Platform=x64
 ```
 
-Output: `src/Radha.App/bin/x64/Release/net9.0-windows10.0.19041.0/win-x64/Radha.App.exe`
+Output: `src/Radha.App/bin/x64/Release/net9.0-windows10.0.19041.0/win-x64/RadhaShell.exe`
 
 `WindowsAppSDKSelfContained=true` is set, so the Windows App SDK runtime is copied next to the
 app — no machine-wide install needed. If you prefer framework-dependent deployment, set it to
@@ -109,7 +109,7 @@ app — no machine-wide install needed. If you prefer framework-dependent deploy
 ## First run
 
 ```powershell
-.\build\Radha.App.exe        # bar appears at the top of the primary display
+.\build\RadhaShell.exe        # bar appears at the top of the primary display
 radha dashboard toggle       # or use the logo button in the bar
 ```
 
@@ -168,3 +168,33 @@ Not wired into the app yet — phase 1 uses DWM acrylic/Mica.
 dotnet run --project src/Radha.Tests     # 130 assertions
 dotnet run --project src/Radha.Cli -- scheme extract sample.png --json
 ```
+
+## Shipping one executable
+
+`dotnet publish` produces a folder by default. The release pipeline asks for the single-file form:
+
+```pwsh
+dotnet publish src/Radha.App/Radha.App.csproj -c Release -p:Platform=x64 -r win-x64 `
+  --self-contained true -p:WindowsAppSDKSelfContained=true -p:RadhaSingleFile=true -o publish/exe
+```
+
+That yields `RadhaShell.exe` and nothing else: the .NET runtime and the Windows App SDK are inside
+the bundle, and WinRT content is unpacked to `%TEMP%\.net\RadhaShell\…` on first launch (that is
+what `IncludeAllContentForSelfExtract` buys — WinRT activation resolves file paths, not bundle
+offsets).
+
+Because that is a ~200 MB self-extracting binary, it is **not** the default for local iteration.
+Use it only when you are building something to hand to someone.
+
+### Verifying a build without a desktop
+
+The executable carries its own headless smoke test:
+
+```pwsh
+.\publish\exe\RadhaShell.exe --selftest --out "$env:TEMP\selftest.json"
+```
+
+Exit code 0 means the bundle is intact: the runtime loaded, the Windows App SDK projection resolved,
+and the Core contracts (command catalog, calculator, config, theme, launch guard, IPC endpoint) all
+hold. The release workflow runs exactly this against the published binary and refuses to publish if
+it fails. It never creates a window, so it is valid on a session-0 CI runner.

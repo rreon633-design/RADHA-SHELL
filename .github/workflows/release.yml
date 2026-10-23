@@ -2,12 +2,11 @@ name: release
 
 # RADHA SHELL — continuous delivery
 #
-# Triggered by pushing a version tag:
-#   git tag v0.1.0 && git push origin v0.1.0
+# Ships ONE artefact a person can double-click: RadhaShell.exe. Self-contained and single-file, so
+# it needs no .NET install, no Windows App SDK redistributable and no unzipping.
 #
-# Produces a GitHub Release containing the compiled shell, the native bridge and the
-# compiled shaders, plus the palette CLI. No signing yet — artifacts are unsigned
-# development builds and must say so.
+# Every green `ci` on main publishes a rolling development build; a version tag publishes a real one.
+# The binary is not released until it has been executed on the runner and passed `--selftest`.
 
 on:
   # 0. nightly safety net: a green build today can go red with no code change
@@ -30,8 +29,7 @@ on:
         default: 'v0.0.0-dev'
 
 permissions:
-  contents: write
-  actions: read
+  contents: read
 
 concurrency:
   group: release-${{ github.event_name }}-${{ github.ref }}
@@ -50,7 +48,7 @@ jobs:
       attestations: write
     name: build release artifacts
     runs-on: windows-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
     # A workflow_run fires for failed CI too — only ship when every gate passed.
     if: >
       github.event_name != 'workflow_run' ||
@@ -99,11 +97,44 @@ jobs:
             exit $code
           }
 
-      - name: Publish WinUI shell
+      # The native bridge has to exist *before* publish, otherwise the single-file bundle has no
+      # RadhaNative.dll in it and app-bar docking, DWM effects and global hotkeys silently disappear.
+      - name: Build native bridge
         shell: pwsh
         run: |
+          cmake -B build -S src/Radha.Native -A x64
+          if ($LASTEXITCODE -ne 0) { throw "cmake configure failed" }
+          cmake --build build --config Release
+          if ($LASTEXITCODE -ne 0) { throw "cmake build failed" }
+          New-Item -ItemType Directory -Force -Path src/Radha.App/native | Out-Null
+          Copy-Item build/Release/RadhaNative.dll src/Radha.App/native/RadhaNative.dll -Force
+          Get-Item src/Radha.App/native/RadhaNative.dll | Select-Object Name, Length
+
+      # Same reason: Anything in Assets/ is published as content, so the shaders must be there first.
+      - name: Compile shaders
+        shell: pwsh
+        run: |
+          $fxc = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter fxc.exe |
+                 Where-Object { $_.FullName -match 'x64' } | Select-Object -First 1
+          if (-not $fxc) { throw "fxc.exe not found in the Windows SDK" }
+          New-Item -ItemType Directory -Force -Path src/Radha.App/Assets/shaders | Out-Null
+          Get-ChildItem src\Radha.Shaders\*.hlsl | ForEach-Object {
+            & $fxc.FullName /nologo /T ps_5_0 /E main /Fo "src\Radha.App\Assets\shaders\$($_.BaseName).cso" $_.FullName
+            if ($LASTEXITCODE -ne 0) { throw "shader $($_.Name) failed" }
+          }
+          Get-ChildItem src/Radha.App/Assets/shaders
+
+      - name: Publish single-file shell
+        shell: pwsh
+        run: |
+          # MSBuild's Version property rejects a leading 'v', so strip the tag prefix.
+          $version = $env:RELEASE_VERSION.TrimStart('v')
           $log = Join-Path $env:RUNNER_TEMP 'publish.log'
-          dotnet publish src/Radha.App/Radha.App.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained true -p:WindowsAppSDKSelfContained=true -o publish/app -v:q 2>&1 | Tee-Object -FilePath $log
+          dotnet publish src/Radha.App/Radha.App.csproj `
+            -c Release -p:Platform=x64 -r win-x64 --self-contained true `
+            -p:WindowsAppSDKSelfContained=true -p:RadhaSingleFile=true `
+            -p:Version=$version `
+            -o publish/exe -v:q 2>&1 | Tee-Object -FilePath $log
           $code = $LASTEXITCODE
           $errs = @(Select-String -Path $log -Pattern ': error ' | ForEach-Object { $_.Line.Trim() } | Select-Object -Unique)
           $errs | Select-Object -First 15 | ForEach-Object {
@@ -111,67 +142,58 @@ jobs:
             Write-Host "::error file=src/Radha.App::$m"
           }
           if ($code -ne 0) { Write-Host "::error::publish exited $code with $($errs.Count) error line(s)"; exit $code }
+          if (-not (Test-Path publish/exe/RadhaShell.exe)) { throw "RadhaShell.exe was not produced" }
+          Get-Item publish/exe/RadhaShell.exe | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
+
+      # THE GATE. A release that cannot start is worse than no release: run the actual published
+      # binary and only continue if it passes its own headless checks.
+      - name: Self-test the published executable
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path publish/exe/RadhaShell.exe).Path
+          $out = Join-Path $env:RUNNER_TEMP 'selftest.json'
+          $proc = Start-Process -FilePath $exe -ArgumentList "--selftest", "--out", "`"$out`"" -PassThru -Wait
+          Write-Host "self-test exited $($proc.ExitCode)"
+          if (Test-Path "$out.txt") { Get-Content "$out.txt" }
+          if (-not (Test-Path $out)) { Write-Host "::error::the executable produced no self-test report"; exit 1 }
+          if ($proc.ExitCode -ne 0) { Write-Host "::error::the published executable failed its self-test"; exit 1 }
+          Get-Content $out
 
       - name: Publish CLI
-        run: >
-          dotnet publish src/Radha.Cli/Radha.Cli.csproj
-          -c Release -r win-x64 --self-contained true
-          -p:PublishSingleFile=true -o publish/cli
-
-      - name: Build native bridge
-        run: |
-          cmake -B build -S src/Radha.Native -A x64
-          cmake --build build --config Release
-          Copy-Item build/Release/RadhaNative.dll publish/app/ -Force
-
-      - name: Compile shaders
         shell: pwsh
         run: |
-          $fxc = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter fxc.exe |
-                 Where-Object { $_.FullName -match 'x64' } | Select-Object -First 1
-          New-Item -ItemType Directory -Force -Path publish/app/assets | Out-Null
-          Get-ChildItem src\Radha.Shaders\*.hlsl | ForEach-Object {
-            & $fxc.FullName /nologo /T ps_5_0 /E main /Fo "publish\app\assets\$($_.BaseName).cso" $_.FullName
-            if ($LASTEXITCODE -ne 0) { throw "shader $($_.Name) failed" }
-          }
-
-      - name: Add config sample + notice
-        shell: pwsh
-        run: |
-          Copy-Item examples/shell.json publish/app/shell.sample.json
-          @"
-          RADHA SHELL — unsigned development build
-          ========================================
-          Run:      Radha.App.exe
-          Control:  cli\radha.exe dashboard toggle
-          Config:   %APPDATA%\Radha\shell.json  (see shell.sample.json)
-
-          No lock screen. No Explorer replacement. See docs/ROADMAP.md.
-          "@ | Set-Content publish/app/BUILD-NOTICE.txt -Encoding utf8
-
-      - name: Compose archive
-        shell: pwsh
-        run: Compress-Archive -Path publish/app/*, publish/cli/* -DestinationPath RadhaShell-win-x64.zip
+          $version = $env:RELEASE_VERSION.TrimStart('v')
+          dotnet publish src/Radha.Cli/Radha.Cli.csproj `
+            -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true `
+            -p:Version=$version -o publish/cli
+          if ($LASTEXITCODE -ne 0) { throw "CLI publish failed" }
+          Copy-Item publish/cli/radha.exe publish/exe/radha.exe -Force
+          & publish/exe/radha.exe help
+          if ($LASTEXITCODE -ne 0) { throw "radha.exe does not start" }
 
       - name: Upload artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: RadhaShell-win-x64
-          path: RadhaShell-win-x64.zip
+          path: |
+            publish/exe/RadhaShell.exe
+            publish/exe/radha.exe
           retention-days: 30
 
-      - name: Create GitHub release
-        name: Attest the artifact
+      - name: Attest the executable
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
-          subject-path: RadhaShell-win-x64.zip
+          subject-path: publish/exe/RadhaShell.exe
 
       - name: Write checksums
         shell: pwsh
         run: |
-          $hash = (Get-FileHash RadhaShell-win-x64.zip -Algorithm SHA256).Hash.ToLower()
-          "$hash  RadhaShell-win-x64.zip" | Out-File -Encoding ascii SHA256SUMS.txt
-          Get-Content SHA256SUMS.txt
+          Push-Location publish/exe
+          Get-FileHash RadhaShell.exe, radha.exe -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $($_.Path | Split-Path -Leaf)" } |
+            Set-Content SHA256SUMS.txt -Encoding ascii
+          Pop-Location
+          Get-Content publish/exe/SHA256SUMS.txt
 
       - name: Publish release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
@@ -179,8 +201,9 @@ jobs:
           name: RADHA SHELL ${{ env.RELEASE_VERSION }}
           tag_name: ${{ env.RELEASE_VERSION }}
           files: |
-            RadhaShell-win-x64.zip
-            SHA256SUMS.txt
+            publish/exe/RadhaShell.exe
+            publish/exe/radha.exe
+            publish/exe/SHA256SUMS.txt
           draft: false
           prerelease: ${{ contains(env.RELEASE_VERSION, '-dev') }}
           generate_release_notes: true
@@ -190,19 +213,30 @@ jobs:
             Native Windows shell: WinUI 3 · Composition · Win2D · HLSL · C++/WinRT.
             **No HTML/CSS/JS.**
 
-            ### Verified in this build
-            - core palette engine, config store, IPC protocol, CLI — 235 assertions passed
+            ### Download
+
+            **`RadhaShell.exe`** — that is the whole install. One file, self-contained: no .NET
+            runtime, no Windows App SDK redistributable, nothing to unzip. Put it anywhere and run it.
+
+            `radha.exe` is optional: a command-line remote for a running shell
+            (`radha dashboard toggle`, `radha wallpaper next`, `radha config doctor`).
+
+            Unsigned development build — Windows SmartScreen will ask for confirmation the first
+            time (More info → Run anyway). Verify the download against `SHA256SUMS.txt`.
+
+            ### What was verified before this was published
+
+            - the published `RadhaShell.exe` **was executed on a Windows runner and passed its
+              self-test**; a binary that cannot start is never released
+            - 539 core assertions on Linux
             - XAML audit: every handler, resource key and binding resolves
-            - `Radha.App` C# type-checked against the WinUI reference assemblies
-            - WinUI 3 app + C++/WinRT bridge + HLSL shaders compiled on Windows
+            - `Radha.App` type-checked against the WinUI reference assemblies
+            - C++/WinRT bridge and HLSL shaders compiled on the release runner
 
-            ### Contents
-            | Path | What |
-            |---|---|
-            | `Radha.App.exe` | the shell (bar, dashboard, launcher, control centre, OSD) |
-            | `cli/radha.exe` | command-line control (`radha dashboard toggle`) |
-            | `RadhaNative.dll` | app-bar docking, DWM effects, global hotkeys |
-            | `assets/*.cso` | compiled shaders |
-            | `shell.sample.json` | configuration reference |
+            ### First run
 
-            Unsigned development build. No lock screen; no Explorer replacement.
+            The bar appears at the top of the primary display. Right-click the tray icon for the
+            menu. Config lives in `%APPDATA%\Radha\shell.json`; `radha config doctor` reports
+            problems in it.
+
+            No lock screen; no Explorer replacement.
