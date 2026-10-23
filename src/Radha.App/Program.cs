@@ -17,6 +17,11 @@ public static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        // Must happen before anything touches WinRT. In a single-file bundle the Windows App SDK
+        // DLLs live in the extraction directory rather than next to the executable, and activation
+        // is told to look there.
+        Environment.SetEnvironmentVariable("MICROSOFT_WINDOWSAPPRUNTIME_BASE_DIRECTORY", AppContext.BaseDirectory);
+
         if (HasFlag(args, "--selftest"))
             return RunSelfTest(ArgumentAfter(args, "--out")
                                ?? Path.Combine(Path.GetTempPath(), "radha-selftest.json"));
