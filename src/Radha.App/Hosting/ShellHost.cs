@@ -1,16 +1,23 @@
 using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Radha.App.Services.Win;
 using Radha.App.ViewModels;
 using Radha.App.Views;
 using Radha.Core.Config;
+using Radha.Core.Diagnostics;
 using Radha.Core.Ipc;
 using Radha.Core.Modules;
+using Radha.Core.Net;
+using Radha.Core.Notifications;
+using Radha.Core.Power;
 using Radha.Core.Security;
 using Radha.Core.Services;
 using Radha.Core.Theming;
+using Radha.Core.Updates;
+using Microsoft.UI.Windowing;
 
 namespace Radha.App.Hosting;
 
@@ -43,9 +50,29 @@ public sealed class ShellHost : IAsyncDisposable
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(1) };
     private DispatcherTimer? _weatherTimer;
 
+    // gap-closing services
+    private readonly TrayIcon _tray = new();
+    private readonly List<BarWindow> _bars = new();
+    private readonly BatteryWatch _battery = new();
+    private HotkeyService? _hotkeys;
+    private ConfigWatcher? _configWatcher;
+    private DispatcherTimer? _idleTimer;
+    private UpdateResult? _update;
+    private SettingsWindow? _settings;
+    private string[] _wifiNetworks = Array.Empty<string>();
+    private bool _idleInhibited;
+
     public BarWindow Bar { get; }
     public OverlayWindow Overlay { get; }
     public OsdWindow Osd { get; }
+
+    /// <summary>Non-primary bars, one per extra display. Always includes nothing for a single monitor.</summary>
+    public IReadOnlyList<BarWindow> ExtraBars => _bars;
+    public bool TrayVisible => _tray.IsVisible;
+    public IReadOnlyList<string> HotkeyFailures => _hotkeys?.Failures ?? Array.Empty<string>();
+    public int HotkeysRegistered => _hotkeys?.Registered.Count ?? 0;
+    public UpdateResult? AvailableUpdate => _update;
+    public IReadOnlyList<string> VisibleWifiNetworks => _wifiNetworks;
 
     public ShellHost()
     {
@@ -103,7 +130,12 @@ public sealed class ShellHost : IAsyncDisposable
 
         _theme.Changed += (_, scheme) => _state.ApplyTheme(scheme);
 
-        Bar = new BarWindow(_state);
+        _state.AttachConnectivity(
+            _services.GetRequiredService<INetworkService>(),
+            _bluetooth,
+            _vpn);
+
+        Bar = new BarWindow(_state, null, _config.Bar.Height, _config.Bar.ScrollActions);
         Overlay = new OverlayWindow(_state, _dashboard, _launcher, _controlCenter);
         Osd = new OsdWindow(_state);
 
@@ -129,6 +161,17 @@ public sealed class ShellHost : IAsyncDisposable
 
         _clock.Start();
         await _dashboard.InitializeAsync();
+
+        StartSecondaryBars();
+        StartTray();
+        StartHotkeys();
+        StartConfigWatcher();
+        StartIdleWatch();
+        _ = CheckForUpdatesAsync();
+        _ = ScanWifiAsync();
+
+        // Battery thresholds share the sampler the dashboard already runs.
+        _system.Sampled += (_, sample) => OnSample(sample);
 
         var minutes = Math.Max(5, _config.Services.Weather.RefreshMinutes);
         _weatherTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(minutes) };
@@ -222,6 +265,13 @@ public sealed class ShellHost : IAsyncDisposable
         {
             case ShellModule.Bar:
                 return "ok";
+
+            case ShellModule.Launcher when command == "calc":
+                if (args.Length == 0) return "usage: radha launcher calc <expression>";
+                var expression = string.Join(' ', args);
+                return Core.Launcher.Calculator.TryEvaluate(expression, out var value)
+                    ? Core.Launcher.Calculator.Format(value)
+                    : "not a calculation";
 
             case ShellModule.Dashboard:
             case ShellModule.Launcher:
@@ -344,6 +394,8 @@ public sealed class ShellHost : IAsyncDisposable
                         return args.FirstOrDefault() ?? "0";
                     case "uptime":
                         return _state.UptimeText;
+                    case "update-check":
+                        return CheckUpdatesAsync().GetAwaiter().GetResult();
                 }
                 return null;
 
@@ -352,6 +404,18 @@ public sealed class ShellHost : IAsyncDisposable
                 return JsonSerializer.Serialize(new { enabled = _bluetooth.Enabled, devices = _bluetooth.Devices.Count });
 
             case ShellModule.Network:
+                if (command == "wifi-list")
+                {
+                    var networks = WifiScanner.ScanAsync().GetAwaiter().GetResult();
+                    return JsonSerializer.Serialize(networks.Select(n => new
+                    {
+                        ssid = n.Ssid,
+                        signal = n.SignalPercent,
+                        bars = n.Bars,
+                        secure = n.Secure,
+                        auth = n.Authentication
+                    }));
+                }
                 var network = _services.GetRequiredService<INetworkService>().Current;
                 return JsonSerializer.Serialize(new
                 {
@@ -379,6 +443,48 @@ public sealed class ShellHost : IAsyncDisposable
                     case "monitor-override":
                         if (args.Length < 2) return "usage: radha config monitor-override <monitor> <json>";
                         return _configStore.SaveMonitorOverride(args[0], args[1]);
+                    case "doctor":
+                    {
+                        var text = File.Exists(_configStore.ConfigPath) ? File.ReadAllText(_configStore.ConfigPath) : "{}";
+                        var report = new ConfigDoctor().Scan(text, _configStore.ConfigPath);
+                        return JsonSerializer.Serialize(new
+                        {
+                            summary = report.Summary,
+                            version = report.Version,
+                            fixable = report.Fixable,
+                            findings = report.Findings.Select(f => new
+                            {
+                                severity = f.Severity.ToString(),
+                                path = f.Path,
+                                message = f.Message
+                            })
+                        });
+                    }
+                    case "fix":
+                    {
+                        var text = File.Exists(_configStore.ConfigPath) ? File.ReadAllText(_configStore.ConfigPath) : "{}";
+                        var (fixedJson, report) = new ConfigDoctor().Fix(text);
+                        File.WriteAllText(_configStore.ConfigPath, fixedJson);
+                        return report.Fixes.Count == 0
+                            ? "nothing to fix"
+                            : string.Join("\n", report.Fixes);
+                    }
+                    case "diagnostics":
+                    {
+                        var root = ConfigStore.DefaultRoot();
+                        var path = Path.Combine(
+                            Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+                            $"radha-diagnostics-{DateTime.Now:yyyyMMdd-HHmmss}.zip");
+                        new DiagnosticsBundle()
+                            .WithEnvironment(configPath: _configStore.ConfigPath,
+                                             logDirectory: Path.Combine(root, "logs"))
+                            .WithTextFile("config/shell.json", _configStore.ConfigPath)
+                            .WithTextFile("logs/ipc-audit.log", Path.Combine(root, "logs", "ipc-audit.log"))
+                            .WithReport($"hotkeys: {HotkeysRegistered}\ntray: {TrayVisible}\n" +
+                                        string.Join("\n", HotkeyFailures.Select(f => "hotkey failure: " + f)))
+                            .Build(path);
+                        return path;
+                    }
                 }
                 return null;
         }
@@ -429,10 +535,225 @@ public sealed class ShellHost : IAsyncDisposable
         }
     }
 
+    // ---------------- gap-closing services ----------------
+
+    /// <summary>
+    /// One bar per display. Windows users have several monitors as the rule rather than the
+    /// exception, and a shell that only paints the primary one looks broken on a laptop + dock.
+    /// Each bar applies its own monitor override from <c>%APPDATA%\Radha\monitors\&lt;id&gt;\shell.json</c>.
+    /// </summary>
+    private void StartSecondaryBars()
+    {
+        try
+        {
+            foreach (var area in DisplayArea.FindAll())
+            {
+                if (area.IsPrimary) continue;
+
+                var key = "display-" + area.DisplayId.Value.ToString("x");
+                var monitorConfig = _configStore.LoadForMonitor(key);
+                if (!monitorConfig.Bar.ShowOnAllDisplays) continue;
+
+                var bar = new BarWindow(_state, area, monitorConfig.Bar.Height, monitorConfig.Bar.ScrollActions);
+                _bars.Add(bar);
+                bar.Activate();
+            }
+        }
+        catch (Exception)
+        {
+            // Older Window App SDK builds can throw from FindAll on a session-0 runner; the
+            // primary bar is already up, so this is not fatal.
+        }
+    }
+
+    private void StartTray()
+    {
+        _tray.Activated += () => _ = ExecuteCommandAsync("launcher", "toggle", Array.Empty<string>());
+        _tray.DoubleClicked += () => _ = ExecuteCommandAsync("dashboard", "toggle", Array.Empty<string>());
+        _tray.MenuBuilder = () => new (int, string?)[]
+        {
+            (1, "Dashboard"),
+            (2, "Launcher"),
+            (3, "Control centre"),
+            (4, "Notifications"),
+            (5, null),
+            (6, "Settings"),
+            (7, "Diagnostics bundle"),
+            (8, null),
+            (9, "Quit RADHA SHELL")
+        };
+
+        _tray.MenuSelected += id =>
+        {
+            switch (id)
+            {
+                case 1: _ = ExecuteCommandAsync("dashboard", "toggle", Array.Empty<string>()); break;
+                case 2: _ = ExecuteCommandAsync("launcher", "toggle", Array.Empty<string>()); break;
+                case 3: _ = ExecuteCommandAsync("controlcenter", "toggle", Array.Empty<string>()); break;
+                case 4: _ = ExecuteCommandAsync("notifications", "toggle", Array.Empty<string>()); break;
+                case 6: OpenSettings(); break;
+                case 7: _ = ExecuteCommandAsync("config", "diagnostics", Array.Empty<string>()); break;
+                case 9: Application.Current.Exit(); break;
+            }
+        };
+
+        if (_config.Bar.ShowTray) _tray.Create("RADHA SHELL");
+    }
+
+    private void StartHotkeys()
+    {
+        _hotkeys = new HotkeyService((module, command) => ExecuteCommandAsync(module, command, Array.Empty<string>()));
+        var bound = _hotkeys.Start();
+        _tray.SetTooltip(bound > 0
+            ? $"RADHA SHELL — {bound} hotkey(s) active"
+            : "RADHA SHELL");
+    }
+
+    /// <summary>
+    /// Watches the config file. A settled, parseable write is adopted without restarting: theme,
+    /// scale and bar height apply live, and the parser refuses half-written files.
+    /// </summary>
+    private void StartConfigWatcher()
+    {
+        _configWatcher = new ConfigWatcher(_configStore.ConfigPath);
+        _configWatcher.Changed += _ =>
+        {
+            var fresh = _configStore.Load();
+            if (_theme is ThemeService theme) theme.Initialize(fresh);
+            Ui.Post(() => _state.Tick());
+        };
+        _configWatcher.Start();
+    }
+
+    /// <summary>
+    /// Keeps the display awake while media plays or a fullscreen app runs, and releases the
+    /// request otherwise. It never locks the session — locking is out of scope for this project.
+    /// </summary>
+    private void StartIdleWatch()
+    {
+        _idleTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
+        _idleTimer.Tick += (_, _) =>
+        {
+            var inputs = new IdleInputs(
+                IdleFor: IdleClock.IdleFor(),
+                MediaPlaying: _media.State == PlaybackState.Playing,
+                Charging: _state.IsCharging,
+                FullscreenApp: false,
+                UserInhibited: false);
+
+            var decision = IdlePolicy.Evaluate(inputs, IdleConfig.Default);
+            var want = decision.InhibitDisplay;
+
+            if (want == _idleInhibited) return;
+            _idleInhibited = want;
+            IdleClock.SetInhibit(want);
+        };
+        _idleTimer.Start();
+    }
+
+    private void OnSample(SystemSample sample)
+    {
+        _state.SetBattery(sample.BatteryPercent ?? 0, sample.BatteryCharging);
+
+        var warning = _battery.Update(sample.BatteryPercent, sample.BatteryCharging);
+        if (warning is null) return;
+
+        _notifications.Push(new ShellNotification(
+            "battery:" + warning.Level,
+            "system",
+            "RADHA SHELL",
+            warning.Title,
+            warning.Message,
+            warning.Critical ? NotificationUrgency.High : NotificationUrgency.Normal,
+            DateTimeOffset.Now,
+            Array.Empty<string>()));
+    }
+
+    public void OpenSettings()
+    {
+        if (_settings is not null)
+        {
+            _settings.Activate();
+            return;
+        }
+
+        _settings = new SettingsWindow(
+            _configStore,
+            _theme,
+            CheckUpdatesAsync,
+            _hotkeys?.Registered.Count ?? 0,
+            _hotkeys?.Failures ?? Array.Empty<string>());
+        _settings.Closed += (_, _) => _settings = null;
+        _settings.Activate();
+    }
+
+    /// <summary>Runs the check and returns a sentence for the UI; also stores the result.</summary>
+    public async Task<string> CheckUpdatesAsync()
+    {
+        await CheckForUpdatesAsync().ConfigureAwait(false);
+        return _update?.Summary ?? "could not reach GitHub";
+    }
+
+    private async Task CheckForUpdatesAsync()
+    {
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("RadhaShell/update-check");
+
+            var json = await client.GetStringAsync(
+                "https://api.github.com/repos/rreon633-design/RADHA-SHELL/releases?per_page=20").ConfigureAwait(false);
+
+            var releases = new List<ReleaseInfo>();
+            foreach (var node in JsonNode.Parse(json)?.AsArray() ?? new JsonArray())
+            {
+                var tag = node?["tag_name"]?.GetValue<string>();
+                if (string.IsNullOrWhiteSpace(tag)) continue;
+
+                releases.Add(new ReleaseInfo(
+                    tag,
+                    node?["prerelease"]?.GetValue<bool>() ?? false,
+                    node?["html_url"]?.GetValue<string>(),
+                    node?["published_at"] is JsonNode published && published.GetValueKind() == System.Text.Json.JsonValueKind.String
+                        ? DateTimeOffset.Parse(published.GetValue<string>(), System.Globalization.CultureInfo.InvariantCulture)
+                        : null));
+            }
+
+            var current = ReleaseCheck.CurrentOrDefault(
+                typeof(ShellHost).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
+
+            var result = ReleaseCheck.Pick(releases, current, currentIsPrerelease: current.Revision == 0 && current.Build == 0);
+            Ui.Post(() => _update = result);
+        }
+        catch (Exception)
+        {
+            // Offline is the normal case for a desktop shell; the update tile simply stays quiet.
+        }
+    }
+
+    private async Task ScanWifiAsync()
+    {
+        try
+        {
+            var result = await WifiScanner.ScanAsync().ConfigureAwait(false);
+            Ui.Post(() => _wifiNetworks = result.Select(n => n.Ssid).ToArray());
+        }
+        catch (Exception)
+        {
+            _wifiNetworks = Array.Empty<string>();
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         _clock.Stop();
         _weatherTimer?.Stop();
+        _idleTimer?.Stop();
+        _configWatcher?.Dispose();
+        _hotkeys?.Dispose();
+        _tray.Dispose();
+        foreach (var bar in _bars) { try { bar.Close(); } catch { } }
+
         await _ipc.DisposeAsync();
         if (_system is IDisposable disposableSystem) disposableSystem.Dispose();
         if (_audio is IDisposable disposableAudio) disposableAudio.Dispose();

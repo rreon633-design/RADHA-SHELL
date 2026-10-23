@@ -43,6 +43,9 @@ public static class Program
         Console.WriteLine("\n--- feature hardening ---");
         HardeningTests.RunFeatures(Check);
 
+        Console.WriteLine("\n--- gap-closing features ---");
+        FeatureTests.Run(Check);
+
         Console.WriteLine();
         foreach (var failure in Failures) Console.WriteLine($"  FAIL {failure}");
         Console.WriteLine($"\n{_passed} passed, {Failures.Count} failed");

@@ -19,7 +19,7 @@ described. "Written but not verified" is called out explicitly in the README sta
 - [x] SMTC media, WASAPI+FFT visualiser, LHM telemetry, radios, Open-Meteo weather — written
 - [ ] **Windows build pass**: compile, fix XAML issues, run on a real desktop
 - [ ] Replace remaining 🟡 items in docs/08-features.md as the Windows jobs go green
-- [ ] Per-monitor bars and panel anchoring
+- [x] Per-monitor bars and panel anchoring
 - [ ] App-bar dock verified against maximised / fullscreen windows
 
 ## Phase 2 — Depth
@@ -29,7 +29,7 @@ described. "Written but not verified" is called out explicitly in the README sta
 - [ ] Wire HLSL effects through `CompositionEffectBrush` (compile `.cso` in CI)
 - [x] Virtual desktops: `IVirtualDesktopManagerInternal` with version dispatch, behind the
       existing `IWorkspaceService` contract
-- [ ] Global hotkeys shipped with the app (auto-load `RadhaNative.dll`)
+- [x] Global hotkeys shipped with the app (auto-load `RadhaNative.dll`)
 - [x] System toast mirroring (MSIX identity + `UserNotificationListener`)
 - [x] Bluetooth device enumeration, VPN profiles
 - [ ] Lyrics provider with cached LRCLIB results

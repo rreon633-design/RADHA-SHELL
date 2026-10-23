@@ -4,6 +4,7 @@ using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Shapes;
 using Radha.App.Interop;
@@ -21,11 +22,21 @@ namespace Radha.App.Views;
 public sealed partial class BarWindow : Window
 {
     private readonly ShellState _state;
+    private readonly DisplayArea? _target;
+    private readonly int _barHeight;
+    private readonly string[] _scrollActions;
     private AppWindow? _appWindow;
 
-    public BarWindow(ShellState state)
+    /// <summary>
+    /// A bar on the primary display when no target is given, or on a specific display with a
+    /// height taken from that monitor's config override.
+    /// </summary>
+    public BarWindow(ShellState state, DisplayArea? target = null, int barHeight = 0, string[]? scrollActions = null)
     {
         _state = state;
+        _target = target;
+        _barHeight = barHeight > 0 ? barHeight : 42;
+        _scrollActions = scrollActions ?? new[] { "volume", "workspaces" };
         InitializeComponent();
         Root.DataContext = state;
 
@@ -73,6 +84,25 @@ public sealed partial class BarWindow : Window
         }
     }
 
+    /// <summary>
+    /// Scroll on the bar: volume or workspace depending on configuration. Pointer input is read in
+    /// the code-behind because the segments are generated (the workspace strip is rebuilt on every
+    /// change) and handlers attached in code survive that.
+    /// </summary>
+    private void OnBarWheel(object sender, PointerRoutedEventArgs e)
+    {
+        var delta = e.GetCurrentPoint(Root).Properties.MouseWheelDelta;
+        if (delta == 0) return;
+
+        var direction = delta > 0 ? 1 : -1;
+        if (_scrollActions.Contains("volume", StringComparer.OrdinalIgnoreCase))
+            _state.NudgeVolume(direction * 2);
+        else if (_scrollActions.Contains("workspaces", StringComparer.OrdinalIgnoreCase))
+            _state.CycleWorkspace(direction);
+
+        e.Handled = true;
+    }
+
     private void ConfigureWindow()
     {
         _appWindow = GetAppWindowForCurrentWindow();
@@ -87,10 +117,10 @@ public sealed partial class BarWindow : Window
             presenter.IsAlwaysOnTop = true;
         }
 
-        var display = DisplayArea.GetFromWindowId(_appWindow.Id, DisplayAreaFallback.Primary);
+        var display = _target ?? DisplayArea.GetFromWindowId(_appWindow.Id, DisplayAreaFallback.Primary);
         var width = display.WorkArea.Width;
         var scale = GetDpiScale();
-        var height = (int)Math.Round(42 * scale);
+        var height = (int)Math.Round(_barHeight * scale);
         _appWindow.MoveAndResize(new RectInt32(display.WorkArea.X, display.WorkArea.Y, width, height));
 
         var hwnd = WindowNative.GetWindowHandle(this);

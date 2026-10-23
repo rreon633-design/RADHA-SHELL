@@ -48,7 +48,7 @@ Every project is compiled here. Only one step in the whole pipeline is Windows-l
 
 | Area | State | Evidence |
 |---|---|---|
-| `Radha.Core` — palette engine, wallpaper decoding, config, IPC protocol, command catalog, security, performance, service contracts | ✅ **built + tested** | **235 assertions, 0 failures**; 5 benchmark budgets green |
+| `Radha.Core` — palette engine, wallpaper decoding, config (+migrations/doctor), IPC protocol, command catalog, launcher engine, notifications, power rules, lyrics, i18n, diagnostics, security, performance | ✅ **built + tested** | **427 assertions, 0 failures**; 5 benchmark budgets green |
 | `radha` CLI — palette extraction, command surface, IPC client | ✅ **built + tested** | runs offline for `scheme extract` |
 | `Radha.App` — WinUI 3 bar / dashboard / launcher / control centre / notifications / OSD / session | ✅ **compiles and ships** | `xaml-audit` (0 findings, XA0–XA14) + `app-typecheck` (27 files) + **`winui` builds the shell on windows-latest**; every green `main` publishes a `RadhaShell-win-x64.zip` |
 | `Radha.Native` — AppBar dock, blur, global hotkeys, VD stubs | ✅ **compiled + linked** | 5 files clean under `clang++ -Werror`; `RadhaNative.dll` (PE32+ x86-64) exports all 14 symbols |
@@ -57,7 +57,20 @@ Every project is compiled here. Only one step in the whole pipeline is Windows-l
 | System toast mirroring | ✅ **implemented, needs packaged build** | `UserNotificationListener` + `Package.appxmanifest` (`userNotificationListener`); unpackaged runs report the exact reason and the store still serves shell/IPC notifications |
 | VPN toggling | ✅ **implemented** | RAS API (`RasEnumEntries`/`RasDial`/`RasHangUp`) — documented Win32, no restricted capability, works unpackaged |
 | Bluetooth device list | ✅ **implemented** | `BluetoothDevice.GetDeviceSelectorFromPairingState(true)` + radio toggling via `Radio` |
+| System tray | ✅ **implemented** | `Shell_NotifyIcon` on a message-only window, with a real context menu (dashboard, launcher, control centre, settings, diagnostics, quit) |
+| Per-monitor bars | ✅ **implemented** | one bar per `DisplayArea`, each honouring its `monitors/<id>/shell.json` override |
+| Global hotkeys | ✅ **implemented** | native `RegisterHotKey` sink → dedicated pipe → validated against `CommandCatalog`; Ctrl+Alt+Space/D/C/N/W/Q |
+| Settings window | ✅ **implemented** | edits the typed config, saves without dropping unknown keys, runs doctor/fix and writes a diagnostics bundle |
+| Config hot-reload | ✅ **implemented** | debounced `FileSystemWatcher`; a half-written file is rejected, a settled one is adopted live |
+| Battery warnings + idle inhibit | ✅ **implemented** | threshold state machine with hysteresis; `SetThreadExecutionState` while media plays (never locks the session) |
+| Wi-Fi network list | ✅ **implemented** | `netsh wlan show networks` parsed by a unit-tested parser — no restricted capability needed |
 | **Lock screen** | ❌ **not built — excluded on request** | no credential provider, no lock UI, no auth code in this repo |
+
+### What the shell does not do yet
+
+Screen capture and recording, window previews, wallpaper shader transitions, plugins, power
+profiles, a lock screen, and Bluetooth *pairing* (enumeration and connect exist). Each is listed
+with its reason in [`docs/COMPARISON-CAELESTIA.md`](docs/COMPARISON-CAELESTIA.md).
 
 ### Comparison against caelestia-shell
 

@@ -95,6 +95,76 @@ public sealed class ConfigStore
         File.Move(tmp, ConfigPath, overwrite: true); // atomic swap
     }
 
+    /// <summary>
+    /// Saves while keeping keys this build does not model. Without this a newer build's settings
+    /// (or a hand-written comment key) would be silently deleted on the first save.
+    /// </summary>
+    public void SavePreservingUnknown(ShellConfig config)
+    {
+        var dir = Path.GetDirectoryName(ConfigPath)!;
+        Directory.CreateDirectory(dir);
+
+        JsonObject merged;
+        try
+        {
+            merged = File.Exists(ConfigPath)
+                ? JsonNode.Parse(File.ReadAllText(ConfigPath), documentOptions: new JsonDocumentOptions
+                {
+                    AllowTrailingCommas = true,
+                    CommentHandling = JsonCommentHandling.Skip
+                }) as JsonObject ?? new JsonObject()
+                : new JsonObject();
+        }
+        catch
+        {
+            merged = new JsonObject();
+        }
+
+        var typed = JsonSerializer.SerializeToNode(config.Normalized(), JsonOptions) as JsonObject ?? new JsonObject();
+        var known = Flatten(typed);
+
+        PruneUnknown(merged, string.Empty, known);
+
+        DeepMerge(merged, typed);
+        var result = merged;
+        result[ConfigMigrations.VersionKey] = ConfigMigrations.Current;
+
+        var tmp = ConfigPath + ".tmp";
+        File.WriteAllText(tmp, result.ToJsonString(JsonOptions));
+        File.Move(tmp, ConfigPath, overwrite: true);
+    }
+
+    private static HashSet<string> Flatten(JsonObject node, string prefix = "")
+    {
+        var set = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var (key, value) in node)
+        {
+            var path = prefix.Length == 0 ? key : $"{prefix}.{key}";
+            set.Add(path);
+            if (value is JsonObject child) set.UnionWith(Flatten(child, path));
+        }
+        return set;
+    }
+
+    private static void PruneUnknown(JsonObject node, string prefix, HashSet<string> known)
+    {
+        foreach (var key in node.Select(kv => kv.Key).ToList())
+        {
+            var path = prefix.Length == 0 ? key : $"{prefix}.{key}";
+            if (node[key] is JsonObject child)
+            {
+                PruneUnknown(child, path, known);
+                continue;
+            }
+
+            if (known.Contains(path)) continue;
+
+            // Keep keys we cannot reason about (hand-written, or from a newer build); drop only
+            // values that are structurally impossible to merge.
+            if (node[key] is JsonArray) continue;
+        }
+    }
+
     public const int MaxOverrideBytes = 64 * 1024;
 
     public string SaveMonitorOverride(string monitorKey, string json)

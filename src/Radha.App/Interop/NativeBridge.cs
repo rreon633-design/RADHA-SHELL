@@ -36,6 +36,22 @@ internal static class NativeBridge
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool RadhaWorkspaceMoveActiveWindow(int index);
 
+    // ---- global hotkeys -------------------------------------------------
+    // The native sink owns the window and the WM_HOTKEY loop; it writes one text line
+    // ("module command") into a dedicated pipe, which HotkeyService validates against
+    // CommandCatalog before anything executes.
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool RadhaHotkeyRegister(int id, uint modifiers, uint virtualKey);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool RadhaHotkeyUnregister(int id);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
+    internal static extern void RadhaHotkeySetPipeEndpoint(string? pipeName);
+
     /// <summary>
     /// Probes the bridge once. Returns false when the DLL is missing or the running Windows build
     /// has no verified virtual-desktop layout — callers then use the labelled fallback.

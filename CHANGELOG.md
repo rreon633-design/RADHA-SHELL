@@ -4,6 +4,40 @@ All notable changes to RADHA SHELL are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning is
 [SemVer](https://semver.org/).
 
+## Unreleased — caelestia parity pass
+
+Closes the gaps found in the caelestia-shell comparison (`docs/COMPARISON-CAELESTIA.md`).
+
+**Core (all unit-tested, 255 → 427 assertions)**
+- `ConfigMigrations` — forward-only schema migrations; unknown keys survive.
+- `ConfigDoctor` — scans `shell.json` for invalid JSON, out-of-range values, unknown keys and
+  future schema versions, and repairs what can be repaired safely.
+- `ConfigWatcher` — debounced hot-reload that refuses half-written files.
+- `LauncherEngine` + `Calculator` — `>` actions, dangerous-action gate, favourites, hidden apps,
+  vim navigation, and arithmetic with a hand-written recursive-descent parser.
+- `NotificationRules` — grouping, expiry, Do-Not-Disturb and clearing policy.
+- `BatteryWatch` / `IdlePolicy` / `RefreshProfile` — thresholds with hysteresis, inhibit decisions,
+  and battery-aware polling.
+- `Lrc` + `LyricsQuery` — LRC parsing and LRCLIB query shaping.
+- `WifiScanParser` — parses `netsh wlan show networks`.
+- `Translator` / `PluralRules` / `Units` — catalogues, CLDR plurals, clock/temperature/size formats.
+- `ReleaseCheck` — semver parsing and release selection.
+- `Series` — allocation-free history ring buffer.
+- `DiagnosticsBundle` — redacted, traversal-safe bug-report zip.
+
+**App**
+- System tray (`Shell_NotifyIcon`) with a real context menu.
+- One bar per display, each honouring its per-monitor override.
+- Global hotkeys wired end to end through a dedicated pipe.
+- Settings window: appearance, bar, integrations and config health.
+- Notification rows now render their source actions.
+- Bar scroll adjusts volume or switches workspace; Wi-Fi/Bluetooth/VPN glyphs are live.
+- Idle inhibitor (`SetThreadExecutionState`) while media plays — never locks the session.
+
+**Tooling**
+- `tools/TypeCheck` now resolves `xmlns:` → CLR prefixes, so custom views are typed instead of
+  falling back to `FrameworkElement`; that alone caught two real errors.
+
 ## [Unreleased]
 
 ### Added

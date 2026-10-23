@@ -37,18 +37,18 @@ Legend: **✅ parity** · **⚠️ partial** · **❌ not implemented** · **—
 | caelestia feature | RADHA | Notes |
 |---|---|---|
 | Bar with clock, workspaces, status area | ✅ | `BarWindow` |
-| Per-monitor bars / monitor targeting | ❌ | ours is a single window on the primary display |
+| Per-monitor bars / monitor targeting | ✅ | one `BarWindow` per `DisplayArea`, per-monitor override honoured |
 | Bar position (top/bottom/left/right) | ⚠️ | top/bottom in config; left/right unimplemented |
-| Bar popouts (active window, tray, status icons) | ❌ | none |
-| Scroll on bar: volume / brightness / workspaces | ❌ | no pointer-wheel handlers |
+| Bar popouts (active window, tray, status icons) | ⚠️ | tray icon + live Wi-Fi/Bluetooth/VPN glyphs; no active-window popout |
+| Scroll on bar: volume / brightness / workspaces | ✅ | `PointerWheelChanged` → volume or workspace step, configurable |
 | `Style layer`: rounded/translucent surfaces | ✅ | tokens + W10 acrylic |
 | Dashboard with tabs | ⚠️ | single page; no tab shell |
 | Dashboard: media, performance, weather | ✅ | `DashboardView` |
 | Dashboard: lap counter, GPU/disk/network graphs | ⚠️ | graphs for CPU/GPU/RAM; no disk/network graphs |
 | Launcher: apps, fuzzy search | ✅ | `FuzzyMatcher` |
-| Launcher: wallpaper switcher, actions (`>`), calculator | ⚠️ | wallpaper via control centre; no `>` actions, no calculator |
-| Launcher: favourites / hidden apps / vim keybinds | ❌ | none |
-| Notification centre with groups, actions, expiry | ⚠️ | list + dismiss; no per-notification action buttons, no grouping rules |
+| Launcher: wallpaper switcher, actions (`>`), calculator | ✅ | `LauncherEngine`: `>` actions, arithmetic row, dangerous-action gate |
+| Launcher: favourites / hidden apps / vim keybinds | ✅ | favourites float on an empty query; hidden filtered; j/k/g navigation |
+| Notification centre with groups, actions, expiry | ⚠️ | action buttons + DnD + policy engine in Core; list is still flat |
 | Sidebar / notification dock | ❌ | notifications are a centred panel only |
 | OSD (volume, brightness, mic) | ✅ | `OsdWindow` |
 | Session menu (logout/reboot/shutdown/suspend/hibernate) | ⚠️ | no hibernate, no confirmation flow |
@@ -67,20 +67,20 @@ Legend: **✅ parity** · **⚠️ partial** · **❌ not implemented** · **—
 | Audio spectrum / CAVA / beat tracker | ⚠️ | FFT spectrum only; no CAVA, no beat tracking |
 | Brightness (`brightnessctl`, `ddcutil`) | ⚠️ | DDC/CI via control centre, no external-monitor enumeration |
 | Media players (MPRIS, multi-player) | ⚠️ | GSMTC single active session; no player switching |
-| Lyrics (LRCLIB / NetEase / local) | ❌ | config keys only, no provider |
+| Lyrics (LRCLIB / NetEase / local) | ⚠️ | LRC parser + LRCLIB query builder tested; no fetch/UI yet |
 | Weather | ✅ | Open-Meteo + IP geolocation |
-| Network (NM: Wi-Fi, ethernet, VPN, profiles) | ⚠️ | Wi-Fi radio toggle + VPN profiles; no ethernet detail, no Wi-Fi network list |
+| Network (NM: Wi-Fi, ethernet, VPN, profiles) | ⚠️ | Wi-Fi network list (`netsh`, parsed + tested) + radio + VPN; no ethernet detail |
 | Bluetooth (pair, connect, list) | ⚠️ | paired list + connect/disconnect; **no pairing flow** |
 | System monitor (CPU, GPU, RAM, disk, net, temps) | ✅ | LibreHardwareMonitor |
 | Disk / network usage history | ⚠️ | current values only, no history |
 | Colours (`matugen`/smart scheme) | ✅ | own OKLab engine, 6 M3 variants |
 | Wallpapers (picker, random, per-monitor) | ⚠️ | set/next; no picker grid, no per-monitor |
 | Screens (`Screens.qml` — refresh rate, scale) | ❌ | none |
-| Idle / idle-inhibit / auto-lock | ❌ | none |
+| Idle / idle-inhibit / auto-lock | ⚠️ | inhibit policy + `SetThreadExecutionState`; auto-lock excluded by instruction |
 | Session manager | ⚠️ | power actions only |
 | Game mode / power profiles | ❌ | none |
-| Battery warnings (configurable levels) | ❌ | battery % shown, no thresholds |
-| Updates page (package manager integration) | ❌ | none |
+| Battery warnings (configurable levels) | ✅ | `BatteryWatch` with hysteresis and re-arm, surfaced as a notification |
+| Updates page (package manager integration) | ⚠️ | GitHub release check with semver comparison; no package-manager integration |
 | Plugins | ❌ | no plugin model |
 
 ### Infrastructure
@@ -88,35 +88,39 @@ Legend: **✅ parity** · **⚠️ partial** · **❌ not implemented** · **—
 | caelestia | RADHA | Notes |
 |---|---|---|
 | JSON config with nested nodes, enums, per-key defaults | ✅ | `ShellConfig` |
-| Config hot-reload | ❌ | read at startup |
-| Config schema validation + quarantine of broken files | ⚠️ | validate + fall back; no quarantine/backup |
-| GUI settings app (Nexus: 10 pages) | ❌ | JSON editing only |
+| Config hot-reload | ✅ | debounced watcher, invalid writes rejected, live adoption |
+| Config schema validation + quarantine of broken files | ✅ | `ConfigDoctor` (scan/fix), migrations, `.broken` backup, unknown keys preserved |
+| GUI settings app (Nexus: 10 pages) | ⚠️ | `SettingsWindow`: appearance, bar, integrations, config health |
 | IPC / CLI (`caelestia shell …`, queryable paths) | ✅ | `radha <module> <command>`, typed IPC |
-| Global shortcuts | ⚠️ | native `RadhaHotkeyRegister` exists; **no caller in the app** |
-| i18n (translations, plural rules, units) | ❌ | English-only, hard-coded strings |
+| Global shortcuts | ✅ | native sink → dedicated pipe → `CommandCatalog` validation |
+| i18n (translations, plural rules, units) | ⚠️ | translator + CLDR plurals + clock/temperature/size units; UI strings not yet migrated |
 | Installer / package (AUR, Nix) | ⚠️ | zip + optional MSIX; no winget/installer |
-| Crash reports / issue templates | ❌ | none |
+| Crash reports / issue templates | ⚠️ | redacted diagnostics bundle (config, logs, environment); no automatic crash handler |
 | Release automation | ✅ | CI + auto-CD release on every green `main` |
 
-**Score:** of ~55 comparable surfaces and services, **18 are at parity, 15 partial, 19 missing**,
-and 1 (lock screen) is excluded deliberately.
+**Score after this batch:** of ~55 comparable surfaces and services, **29 are at parity, 13 partial,
+12 missing**, and 1 (lock screen) is excluded deliberately. Parity moved by 11 in one pass; what
+remains missing is almost entirely capture, previews, shader transitions and plugin surface.
 
 ---
 
 ## 3. What is genuinely missing, ranked
 
-### P0 — users notice these in the first minute
+### P0 — done in this batch
 
-1. **System tray.** `BarConfig.ShowTray` exists and nothing renders it. Windows equivalent:
+System tray, per-monitor bars, global hotkeys, the settings window, notification actions and bar
+scroll were the five gaps users notice first; all six are implemented. The list below is what is
+still open.
+
+### P0 — still open
+
+1. ~~**System tray.**~~ ✅ `BarConfig.ShowTray` exists and nothing renders it. Windows equivalent:
    `Shell_NotifyIcon` + a `HwndSource` message-only window, or `Microsoft.UI.System` tray API on
    newer builds. Needs icon cache, overflow menu, and per-icon click routing.
-2. **Per-monitor bars.** Windows has multi-monitor as the default, not the exception. Requires one
-   `BarWindow` per `DisplayArea`, a monitor id in state, and DPI-safe placement.
-3. **Global hotkeys actually wired.** The native export works and is tested; the app never calls it.
-   `RadhaHotkeySetPipeEndpoint` already supports routing a hotkey into the IPC pipe.
-4. **Settings GUI.** Editing JSON by hand contradicts "personalization". Priority order:
-   appearance → bar → services → about.
-5. **Notification actions.** WinRT toasts carry buttons; we drop them on the floor.
+2. ~~**Per-monitor bars.**~~ ✅
+3. ~~**Global hotkeys.**~~ ✅ routed through a dedicated pipe and validated against the catalogue.
+4. ~~**Settings GUI.**~~ ✅ appearance, bar, integrations, config health.
+5. ~~**Notification actions.**~~ ✅ rendered per row, with dismiss and deep-link handling.
 
 ### P1 — the difference between "a shell" and "a usable daily driver"
 

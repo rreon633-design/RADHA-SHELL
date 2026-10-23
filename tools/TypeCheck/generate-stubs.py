@@ -27,6 +27,24 @@ SIMPLE = {
     "ItemsControl": "Microsoft.UI.Xaml.Controls.ItemsControl",
     "ItemsRepeater": "Microsoft.UI.Xaml.Controls.ItemsRepeater",
     "UserControl": "Microsoft.UI.Xaml.Controls.UserControl",
+    "ToggleSwitch": "Microsoft.UI.Xaml.Controls.ToggleSwitch",
+    "CheckBox": "Microsoft.UI.Xaml.Controls.CheckBox",
+    "RadioButton": "Microsoft.UI.Xaml.Controls.RadioButton",
+    "ScrollViewer": "Microsoft.UI.Xaml.Controls.ScrollViewer",
+    "Image": "Microsoft.UI.Xaml.Controls.Image",
+    "Canvas": "Microsoft.UI.Xaml.Controls.Canvas",
+    "RelativePanel": "Microsoft.UI.Xaml.Controls.RelativePanel",
+    "NavigationView": "Microsoft.UI.Xaml.Controls.NavigationView",
+    "Expander": "Microsoft.UI.Xaml.Controls.Expander",
+    "InfoBar": "Microsoft.UI.Xaml.Controls.InfoBar",
+    "HyperlinkButton": "Microsoft.UI.Xaml.Controls.HyperlinkButton",
+    "ToggleButton": "Microsoft.UI.Xaml.Controls.Primitives.ToggleButton",
+    "RepeatButton": "Microsoft.UI.Xaml.Controls.Primitives.RepeatButton",
+    "ScrollView": "Microsoft.UI.Xaml.Controls.ScrollView",
+    "Rectangle": "Microsoft.UI.Xaml.Shapes.Rectangle",
+    "Ellipse": "Microsoft.UI.Xaml.Shapes.Ellipse",
+    "Path": "Microsoft.UI.Xaml.Shapes.Path",
+    "Window": "Microsoft.UI.Xaml.Window",
 }
 
 def type_for(el, prefixes):
@@ -55,12 +73,12 @@ def main(root, out):
         cls = r.get(f"{XAML_NS}Class")
         if not cls:
             continue  # ResourceDictionary / merged dictionaries
+        # ElementTree does not expose xmlns declarations as attributes; the start-ns event is
+        # the only reliable way to learn which prefix maps to which CLR namespace.
         prefixes = {}
-        for k, v in r.attrib.items():
-            if k.startswith("{http://www.w3.org/2000/xmlns/}") or (k.startswith("xmlns:")):
-                prefix = k.split("}")[-1].split(":")[-1]
-                if v.startswith("using:"):
-                    prefixes[prefix] = v[6:]
+        for _, (prefix, uri) in ET.iterparse(xaml, events=["start-ns"]):
+            if uri.startswith("using:"):
+                prefixes[prefix] = uri[6:]
         fields = []
         seen = set()
         for el in r.iter():

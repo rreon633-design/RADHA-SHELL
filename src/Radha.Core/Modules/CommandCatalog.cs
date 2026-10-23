@@ -30,18 +30,18 @@ public static class CommandCatalog
     {
         [ShellModule.Bar] = new[] { "show", "hide", "toggle", "reload" },
         [ShellModule.Dashboard] = new[] { "open", "close", "toggle", "tab" },
-        [ShellModule.Launcher] = new[] { "open", "close", "toggle", "query" },
+        [ShellModule.Launcher] = new[] { "open", "close", "toggle", "query", "calc" },
         [ShellModule.ControlCenter] = new[] { "open", "close", "toggle" },
-        [ShellModule.Notifications] = new[] { "open", "close", "toggle", "clear", "dnd-on", "dnd-off", "dnd-toggle" },
+        [ShellModule.Notifications] = new[] { "open", "close", "toggle", "clear", "dnd-on", "dnd-off", "dnd-toggle", "dismiss", "action" },
         [ShellModule.Osd] = new[] { "volume", "brightness", "mic", "show" },
         [ShellModule.Session] = new[] { "menu", "logout", "suspend", "reboot", "shutdown" },
         [ShellModule.Media] = new[] { "play-pause", "next", "previous", "seek", "mute", "status" },
         [ShellModule.Wallpaper] = new[] { "set", "next", "random", "list", "current" },
         [ShellModule.Theme] = new[] { "set", "variant", "dark", "light", "toggle", "status", "extract" },
-        [ShellModule.Network] = new[] { "status", "wifi-toggle", "vpn-toggle" },
+        [ShellModule.Network] = new[] { "status", "wifi-toggle", "vpn-toggle", "wifi-list" },
         [ShellModule.Bluetooth] = new[] { "status", "toggle" },
-        [ShellModule.System] = new[] { "status", "volume", "brightness", "uptime" },
-        [ShellModule.Config] = new[] { "get", "set", "path", "reload", "monitor-override" }
+        [ShellModule.System] = new[] { "status", "volume", "brightness", "uptime", "update-check" },
+        [ShellModule.Config] = new[] { "get", "set", "path", "reload", "monitor-override", "doctor", "fix", "diagnostics" }
     };
 
     public static IReadOnlyList<string> For(ShellModule module) => Commands[module];

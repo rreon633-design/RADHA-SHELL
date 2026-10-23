@@ -72,6 +72,15 @@ public sealed class BarConfig
     public string ClockFormat { get; set; } = "24h"; // 12h | 24h
     /// <summary>Windows shell tray icons to mirror (msft: namespace) or "all".</summary>
     public string[] TrayModules { get; set; } = { "network", "bluetooth", "volume", "battery" };
+
+    /// <summary>
+    /// Draw a bar on every display, not only the primary one. Per-monitor overrides live in
+    /// <c>monitors/&lt;id&gt;/shell.json</c> and are merged on top of this.
+    /// </summary>
+    public bool ShowOnAllDisplays { get; set; } = true;
+
+    /// <summary>Bar segments that react to the mouse wheel: "volume", "brightness", "workspaces".</summary>
+    public string[] ScrollActions { get; set; } = { "volume", "workspaces" };
 }
 
 public sealed class DashboardConfig

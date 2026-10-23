@@ -7,7 +7,8 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <Grid x:Name="Root" Height="42" Background="{Binding Theme.BarGlass}">
+    <Grid x:Name="Root" Height="42" Background="{Binding Theme.BarGlass}"
+          PointerWheelChanged="OnBarWheel">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="*" />
@@ -71,13 +72,19 @@
             <Button Width="28" Height="28" Padding="0" BorderThickness="0" CornerRadius="9"
                     Background="Transparent" ToolTipService.ToolTip="Network"
                     Click="OnControlCenterClick">
-                <FontIcon Glyph="&#xE701;" FontSize="13" Foreground="{Binding Theme.OnSurfaceVariant}" />
+                <FontIcon Glyph="{Binding WifiGlyph}" FontSize="13" Foreground="{Binding Theme.OnSurfaceVariant}" />
             </Button>
 
             <Button Width="28" Height="28" Padding="0" BorderThickness="0" CornerRadius="9"
                     Background="Transparent" ToolTipService.ToolTip="Bluetooth"
                     Click="OnControlCenterClick">
-                <FontIcon Glyph="&#xE702;" FontSize="13" Foreground="{Binding Theme.OnSurfaceVariant}" />
+                <FontIcon Glyph="{Binding BluetoothGlyph}" FontSize="13" Foreground="{Binding Theme.OnSurfaceVariant}" />
+            </Button>
+
+            <Button Width="28" Height="28" Padding="0" BorderThickness="0" CornerRadius="9"
+                    Background="Transparent" ToolTipService.ToolTip="VPN connected"
+                    Visibility="{Binding IsVpnConnected, Converter={StaticResource BoolToVisibility}}">
+                <FontIcon Glyph="{Binding VpnGlyph}" FontSize="13" Foreground="{Binding Theme.Primary}" />
             </Button>
 
             <Button Width="28" Height="28" Padding="0" BorderThickness="0" CornerRadius="9"

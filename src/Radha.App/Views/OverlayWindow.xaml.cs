@@ -28,6 +28,7 @@ public sealed partial class OverlayWindow : Window
         _state = state;
         InitializeComponent();
         Root.DataContext = state;
+        NotificationCenter.Host = state;
 
         Dashboard.DataContext = dashboard;
         Launcher.DataContext = launcher;

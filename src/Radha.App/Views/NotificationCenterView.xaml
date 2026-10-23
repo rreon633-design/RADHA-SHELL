@@ -53,6 +53,29 @@
                                 </Grid>
                                 <TextBlock Text="{Binding Body}" FontSize="9.5" TextWrapping="Wrap" MaxLines="3"
                                            Foreground="{Binding BodyBrush}" />
+
+                                <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,2,0,0">
+                                    <ItemsControl ItemsSource="{Binding Actions}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" Spacing="6" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Content="{Binding}" FontSize="9.5" Padding="9,3"
+                                                        CornerRadius="8" BorderThickness="0"
+                                                        Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                                        Foreground="White"
+                                                        Click="OnActionClick" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <Button Content="Dismiss" FontSize="9.5" Padding="9,3" CornerRadius="8"
+                                            BorderThickness="0" Click="OnDismissClick"
+                                            Background="{Binding CardBrush}" Foreground="{Binding BodyBrush}" />
+                                </StackPanel>
                             </StackPanel>
                         </Border>
                     </DataTemplate>

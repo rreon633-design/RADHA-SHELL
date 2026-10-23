@@ -39,6 +39,13 @@ public sealed partial class ShellState : ObservableObject
     [ObservableProperty] private string _uptimeText = "";
 
     public ObservableCollection<WorkspaceItem> Workspaces { get; } = new();
+
+    // Connectivity status shown in the bar. Glyphs are Segoe MDL2 codepoints; the bar binds
+    // these rather than querying services from XAML.
+    [ObservableProperty] private string _wifiGlyph = "\uE701";
+    [ObservableProperty] private string _bluetoothGlyph = "\uE702";
+    [ObservableProperty] private string _vpnGlyph = "\uE72E";
+    [ObservableProperty] private bool _isVpnConnected;
     public ObservableCollection<NotificationItemVm> Notifications { get; } = new();
 
     public event EventHandler? OverlayChanged;
@@ -159,6 +166,78 @@ public sealed partial class ShellState : ObservableObject
 
     public void ApplyTheme(MaterialScheme scheme) => Theme = new ThemeViewModel(scheme);
 
+    // ---------------- connectivity + direct manipulation ----------------
+
+    private INetworkService? _network;
+    private IBluetoothService? _bluetooth;
+    private IVpnService? _vpn;
+
+    /// <summary>Wired by the host once the services exist; the bar and control centre share it.</summary>
+    public void AttachConnectivity(INetworkService? network, IBluetoothService? bluetooth, IVpnService? vpn)
+    {
+        _network = network;
+        _bluetooth = bluetooth;
+        _vpn = vpn;
+
+        if (network is not null) network.Changed += (_, _) => RefreshConnectivity();
+        if (bluetooth is not null) bluetooth.Changed += (_, _) => RefreshConnectivity();
+        if (vpn is not null) vpn.Changed += (_, _) => RefreshConnectivity();
+
+        RefreshConnectivity();
+    }
+
+    public void RefreshConnectivity()
+    {
+        var net = _network?.Current;
+        WifiGlyph = net is { Connected: true }
+            ? (net.SignalStrength >= 60 ? "\uE701" : "\uE874")   // full vs one-bar wifi
+            : "\uE7F4";                                            // disconnected
+        BluetoothGlyph = _bluetooth is { Enabled: true } ? "\uE702" : "\uE703";
+        IsVpnConnected = _vpn?.ConnectedName is { Length: > 0 };
+    }
+
+    /// <summary>
+    /// Runs an action button from a mirrored toast. "open" follows the deep link when the source
+    /// provided one; everything else dismisses, because acting inside another app's notification
+    /// is not something an unpackaged shell is allowed to do.
+    /// </summary>
+    public void RunNotificationAction(NotificationItemVm item, string action)
+    {
+        if (action is "open" or "Open")
+        {
+            var link = item.Notification.DeepLink;
+            if (!string.IsNullOrWhiteSpace(link) &&
+                Uri.TryCreate(link, UriKind.Absolute, out var uri) &&
+                (uri.Scheme is "http" or "https" or "ms-settings" or "mailto"))
+            {
+                _ = Windows.System.Launcher.LaunchUriAsync(uri);
+                return;
+            }
+        }
+
+        _notifications.Dismiss(item.Id);
+    }
+
+    /// <summary>Mouse wheel over the bar: volume by 2 points per notch, clamped.</summary>
+    public void NudgeVolume(int delta)
+    {
+        if (delta == 0) return;
+        var target = Math.Clamp(_audio.Volume + delta, 0, 100);
+        _audio.SetVolume(target);
+        ShowOsd("Volume", target);
+    }
+
+    /// <summary>Mouse wheel over the bar: step through workspaces, wrapping at both ends.</summary>
+    public void CycleWorkspace(int delta)
+    {
+        if (delta == 0 || _workspaces.Workspaces.Count == 0) return;
+
+        var current = _workspaces.Workspaces.FirstOrDefault(w => w.Active)?.Index ?? 0;
+        var count = _workspaces.Workspaces.Count;
+        var target = ((current + delta) % count + count) % count;
+        _ = _workspaces.SwitchToAsync(target);
+    }
+
     public void ShowOsd(string label, double value)
     {
         OsdLabel = label;
@@ -254,6 +333,13 @@ public sealed partial class NotificationItemVm : ObservableObject
     public string Title => Notification.Title;
     public string Body => Notification.Body;
     public string TimeText => Notification.ReceivedAt.ToLocalTime().ToString("HH:mm");
+
+    /// <summary>Action ids carried by the original toast ("open", "reply", …).</summary>
+    public IReadOnlyList<string> Actions => Notification.Actions.Length == 0
+        ? new[] { "dismiss" }
+        : Notification.Actions;
+
+    public bool HasActions => Notification.Actions.Length > 0;
 
     public void ApplyTheme(ThemeViewModel theme)
     {
