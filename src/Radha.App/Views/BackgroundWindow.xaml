@@ -1,0 +1,36 @@
+<Window
+    x:Class="Radha.App.Views.BackgroundWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Radha.App.Controls">
+
+    <Grid x:Name="Root">
+        <Image x:Name="WallpaperBack" Stretch="UniformToFill" />
+        <Image x:Name="WallpaperFront" Opacity="0" Stretch="UniformToFill" />
+        <Rectangle x:Name="DimLayer" Fill="Black" Opacity="0.25" />
+
+        <StackPanel
+            x:Name="ClockPanel"
+            Margin="0,0,72,72"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Bottom"
+            Spacing="4">
+            <TextBlock
+                x:Name="ClockText"
+                FontWeight="SemiBold"
+                FontSize="96"
+                HorizontalAlignment="Right" />
+            <TextBlock
+                x:Name="DateText"
+                Opacity="0.75"
+                FontSize="20"
+                HorizontalAlignment="Right" />
+        </StackPanel>
+
+        <controls:SpectrumBars
+            x:Name="Spectrum"
+            Height="128"
+            Margin="72,0,72,200"
+            VerticalAlignment="Bottom" />
+    </Grid>
+</Window>

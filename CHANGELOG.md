@@ -4,6 +4,18 @@ All notable changes to RADHA SHELL are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning is
 [SemVer](https://semver.org/).
 
+## Unreleased — wallpapers you can actually see
+
+- Wallpaper picker: a thumbnail grid, cached on disk per (path, mtime, size), decoded off the
+  UI thread once.
+- Per-monitor wallpapers through `IDesktopWallpaper` — `SystemParametersInfo` cannot address a
+  single display at all. Placement (fill/fit/stretch/center/span) is part of the same call.
+- `radha wallpaper monitors | assign <monitor-id|*> <path> | fit [mode]`.
+- Optional background layer: wallpaper, clock and audio spectrum drawn behind the desktop icons by
+  reparenting into Explorer's WorkerW. Click-through, non-activating, opt-in, and it fails closed —
+  if the layer cannot attach it is not shown rather than covering the icons.
+- Wallpaper cross-fade in that layer, gated by `MotionTokens` so reduced motion is a cut.
+
 ## Unreleased — polish, policy and supply chain
 
 - `DesignTokens` / `MotionTokens` — spacing, padding, radius, typography, density and reduced-motion

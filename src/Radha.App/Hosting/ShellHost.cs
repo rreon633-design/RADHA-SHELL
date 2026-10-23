@@ -63,6 +63,12 @@ public sealed class ShellHost : IAsyncDisposable
     private bool _idleInhibited;
 
     public BarWindow Bar { get; }
+
+    /// <summary>Optional layer behind the desktop icons; null unless enabled in config.</summary>
+    public BackgroundWindow? Background { get; private set; }
+
+    /// <summary>Why the background layer is not running, when it was asked to. Null when fine.</summary>
+    public string? BackgroundError { get; private set; }
     public OverlayWindow Overlay { get; }
     public OsdWindow Osd { get; }
 
@@ -137,7 +143,15 @@ public sealed class ShellHost : IAsyncDisposable
 
         Bar = new BarWindow(_state, null, _config.Bar.Height, _config.Bar.ScrollActions);
         Overlay = new OverlayWindow(_state, _dashboard, _launcher, _controlCenter);
+        Overlay.ConfigureWallpaper(_wallpaper, _config);
         Osd = new OsdWindow(_state);
+
+        // Opt-in: it is a second full-screen window attached to Explorer's wallpaper host.
+        if (_config.Background.Enabled)
+        {
+            try { Background = new BackgroundWindow(_config, _wallpaper, _audio); }
+            catch (Exception ex) { BackgroundError = ex.Message; }
+        }
 
         _auditLogPath = Path.Combine(_config.Paths.Logs, "ipc-audit.log");
         try { Directory.CreateDirectory(Path.GetDirectoryName(_auditLogPath)!); } catch { }
@@ -339,7 +353,35 @@ public sealed class ShellHost : IAsyncDisposable
                         var applied = _wallpaper.SetAsync(args[0]).GetAwaiter().GetResult();
                         if (applied != default)
                             _theme.Apply(applied, _theme.Current.IsDark, _theme.Current.Variant);
+                        _configStore.SavePreservingUnknown(_config);
                         return args[0];
+
+                    case "monitors":
+                        return JsonSerializer.Serialize(_wallpaper.Monitors);
+
+                    case "assign":
+                        // assign <monitor-id|*> <path>
+                        if (args.Length < 2) return "usage: radha wallpaper assign <monitor-id|*> <path>";
+                        if (args[0] is "*" or "all")
+                        {
+                            var global = _wallpaper.SetAsync(args[1]).GetAwaiter().GetResult();
+                            if (global != default)
+                                _theme.Apply(global, _theme.Current.IsDark, _theme.Current.Variant);
+                            _configStore.SavePreservingUnknown(_config);
+                            return args[1];
+                        }
+                        var perMonitor = _wallpaper.SetForMonitorAsync(args[0], args[1]).GetAwaiter().GetResult();
+                        if (perMonitor == default)
+                            return $"no display accepts background '{args[0]}' (try `radha wallpaper monitors`)";
+                        _theme.Apply(perMonitor, _theme.Current.IsDark, _theme.Current.Variant);
+                        _configStore.SavePreservingUnknown(_config);
+                        return args[1];
+
+                    case "fit":
+                        if (args.Length == 0) return _wallpaper.Fit;
+                        if (!_wallpaper.SetFit(args[0])) return $"unknown placement '{args[0]}' (fill|fit|stretch|center|span)";
+                        _configStore.SavePreservingUnknown(_config);
+                        return _wallpaper.Fit;
                 }
                 return null;
 
@@ -775,6 +817,7 @@ public sealed class ShellHost : IAsyncDisposable
         _hotkeys?.Dispose();
         _tray.Dispose();
         foreach (var bar in _bars) { try { bar.Close(); } catch { } }
+        try { Background?.Close(); } catch { }
 
         await _ipc.DisposeAsync();
         if (_system is IDisposable disposableSystem) disposableSystem.Dispose();

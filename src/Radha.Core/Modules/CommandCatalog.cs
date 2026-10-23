@@ -65,7 +65,7 @@ public static class CommandCatalog
             [ShellModule.Osd] = new[] { "volume", "brightness", "mic", "show" },
             [ShellModule.Session] = new[] { "menu", "logout", "suspend", "reboot", "shutdown" },
             [ShellModule.Media] = new[] { "play-pause", "next", "previous", "seek", "mute", "status" },
-            [ShellModule.Wallpaper] = new[] { "set", "next", "random", "list", "current" },
+            [ShellModule.Wallpaper] = new[] { "set", "next", "random", "list", "current", "assign", "fit", "monitors" },
             [ShellModule.Theme] = new[] { "set", "variant", "dark", "light", "toggle", "status", "extract" },
             [ShellModule.Network] = new[] { "status", "wifi-toggle", "vpn-toggle", "wifi-list", "wifi-connect" },
             [ShellModule.Bluetooth] = new[] { "status", "toggle", "pair", "scan" },

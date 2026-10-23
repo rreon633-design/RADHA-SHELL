@@ -11,6 +11,7 @@ using Radha.Core.Performance;
 using Radha.Core.Power;
 using Radha.Core.Security;
 using Radha.Core.Theming;
+using Radha.Core.Wallpaper;
 using Radha.Core.Services;
 using Radha.Core.Updates;
 
@@ -40,6 +41,7 @@ public static class FeatureTests
         ProfileTests(check);
         ClockTests(check);
         LaunchGuardTests(check);
+        WallpaperTests(check);
     }
 
     // ---------------- design tokens ----------------
@@ -671,6 +673,86 @@ public static class FeatureTests
             var envText = env.ReadToEnd();
             check("diag: environment carries version", envText.Contains("0.1.0", StringComparison.Ordinal));
             check("diag: environment carries runtime", envText.Contains("runtime", StringComparison.Ordinal));
+        }
+        finally
+        {
+            try { Directory.Delete(dir, true); } catch { }
+        }
+    }
+
+    // ---------------- wallpaper ----------------
+
+    private static void WallpaperTests(Action<string, bool> check)
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "radha-wall-" + Guid.NewGuid().ToString("N")[..8]);
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllBytes(Path.Combine(dir, "aurora.png"), new byte[64]);
+            File.WriteAllBytes(Path.Combine(dir, "Basalt.JPG"), new byte[128]);
+            File.WriteAllBytes(Path.Combine(dir, "notes.txt"), new byte[8]);
+            File.WriteAllBytes(Path.Combine(dir, "empty.png"), Array.Empty<byte>());
+
+            var entries = WallpaperLibrary.Scan(dir);
+            check("wallpaper: supported extensions only", entries.Count == 2);
+            check("wallpaper: empty files skipped", entries.All(e => e.Name != "empty"));
+            check("wallpaper: case-insensitive extension", entries.Any(e => e.Name == "Basalt"));
+            check("wallpaper: ordinal-ignore-case ordering", entries[0].Name == "aurora");
+            check("wallpaper: missing directory is empty", WallpaperLibrary.Scan(Path.Combine(dir, "nope")).Count == 0);
+            check("wallpaper: null root is empty", WallpaperLibrary.Scan(null).Count == 0);
+            check("wallpaper: cap respected", WallpaperLibrary.Scan(dir, maxEntries: 1).Count == 1);
+
+            var first = entries[0];
+            var keyA = WallpaperLibrary.ThumbnailKey(first, 240, 135);
+            check("wallpaper: thumbnail key is stable", keyA == WallpaperLibrary.ThumbnailKey(first, 240, 135));
+            check("wallpaper: thumbnail key varies by size", keyA != WallpaperLibrary.ThumbnailKey(first, 320, 180));
+            var touched = first with { ModifiedUtc = first.ModifiedUtc.AddSeconds(5) };
+            check("wallpaper: thumbnail key tracks mtime", keyA != WallpaperLibrary.ThumbnailKey(touched, 240, 135));
+            check("wallpaper: thumbnail key is filename-safe", keyA.Length == 20 && keyA.EndsWith(".png"));
+
+            check("wallpaper: fit parsed", WallpaperLibrary.ParseFit(" SPAN ") == WallpaperFit.Span);
+            check("wallpaper: unknown fit falls back to fill", WallpaperLibrary.ParseFit("diagonal") == WallpaperFit.Fill);
+            check("wallpaper: null fit falls back", WallpaperLibrary.ParseFit(null) == WallpaperFit.Fill);
+            check("wallpaper: fit round-trips", WallpaperLibrary.ParseFit(WallpaperLibrary.ToConfigString(WallpaperFit.Center)) == WallpaperFit.Center);
+
+            check("wallpaper: rooted drive path", WallpaperLibrary.IsRootedImagePath(@"C:\Pictures\a.png"));
+            check("wallpaper: relative path rejected", !WallpaperLibrary.IsRootedImagePath(@"Pictures\a.png"));
+            check("wallpaper: wrong extension rejected", !WallpaperLibrary.IsRootedImagePath(@"C:\Pictures\a.txt"));
+
+            var assignments = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["DISPLAY#ABC123#1"] = @"C:\Pictures\one.png",
+                ["*"] = @"C:\Pictures\fallback.png",
+                ["  "] = @"C:\Pictures\ghost.png",
+                ["MON2"] = "relative.png"
+            };
+            var clean = WallpaperLibrary.SanitizeAssignments(assignments);
+            check("wallpaper: blank monitor dropped", clean.Count == 2);
+            check("wallpaper: relative assignment dropped", !clean.ContainsKey("MON2"));
+            check("wallpaper: unknown monitor kept", clean.ContainsKey("DISPLAY#ABC123#1"));
+
+            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["DISPLAY#ABC123#1"] = @"C:\a.png",
+                ["*"] = @"C:\wild.png"
+            };
+            check("wallpaper: monitor assignment wins", WallpaperLibrary.Resolve("DISPLAY#ABC123#1", map, @"C:\global.png") == @"C:\a.png");
+            check("wallpaper: monitor id case-insensitive", WallpaperLibrary.Resolve("display#abc123#1", map, null) == @"C:\a.png");
+            check("wallpaper: wildcard catches unknown monitor", WallpaperLibrary.Resolve("MON9", map, @"C:\global.png") == @"C:\wild.png");
+            check("wallpaper: fallback when no map", WallpaperLibrary.Resolve("MON9", null, @"C:\global.png") == @"C:\global.png");
+            check("wallpaper: nothing configured is null", WallpaperLibrary.Resolve("MON9", null, "") is null);
+
+            var fade = WallpaperLibrary.PlanTransition(TransitionMode.CrossFade, MotionTokens.Default);
+            check("wallpaper: crossfade blends", fade.Blend && fade.Duration > TimeSpan.Zero);
+            var calm = WallpaperLibrary.PlanTransition(TransitionMode.CrossFade, new MotionTokens(Reduced: true));
+            check("wallpaper: reduced motion cuts", !calm.Blend && calm.Duration == TimeSpan.Zero);
+            check("wallpaper: none mode cuts", !WallpaperLibrary.PlanTransition(TransitionMode.None, MotionTokens.Default).Blend);
+            check("wallpaper: zero-scale motion cuts", !WallpaperLibrary.PlanTransition(TransitionMode.CrossFade, new MotionTokens(Scale: 0)).Blend);
+
+            check("wallpaper: sequential rotation wraps", WallpaperLibrary.NextIndex(2, 3, shuffle: false) == 0);
+            check("wallpaper: single image keeps index", WallpaperLibrary.NextIndex(0, 1, shuffle: false) == 0);
+            var repeated = Enumerable.Range(0, 64).Select(_ => WallpaperLibrary.NextIndex(1, 3, shuffle: true, new Random(7))).ToList();
+            check("wallpaper: shuffle never repeats current", repeated.All(i => i != 1 && i >= 0 && i < 3));
         }
         finally
         {

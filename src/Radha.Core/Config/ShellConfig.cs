@@ -18,6 +18,7 @@ public sealed class ShellConfig
     public ControlCenterConfig ControlCenter { get; set; } = new();
     public ServicesConfig Services { get; set; } = new();
     public WallpaperConfig Wallpaper { get; set; } = new();
+    public BackgroundConfig Background { get; set; } = new();
     public PathsConfig Paths { get; set; } = new();
 
     /// <summary>Clamp user-supplied numbers into ranges the UI can actually render.</summary>
@@ -33,6 +34,7 @@ public sealed class ShellConfig
         Notifications.MaxVisible = Math.Clamp(Notifications.MaxVisible, 1, 10);
         Osd.TimeoutMs = Math.Clamp(Osd.TimeoutMs, 400, 6000);
         Launcher.MaxResults = Math.Clamp(Launcher.MaxResults, 3, 50);
+        Background.Dim = Math.Clamp(Background.Dim, 0, 0.8);
         return this;
     }
 }
@@ -198,10 +200,39 @@ public sealed class WallpaperConfig
     /// <summary>"static" | "video" (video wallpapers are a later phase).</summary>
     public string Mode { get; set; } = "static";
     public string Path { get; set; } = "";
-    public string Fit { get; set; } = "fill"; // fill | fit | stretch | center
+    /// <summary>fill | fit | stretch | center | span. Parsed by <c>WallpaperLibrary.ParseFit</c>.</summary>
+    public string Fit { get; set; } = "fill";
     public double Dim { get; set; } = 0.0;
     public double Blur { get; set; } = 0.0;
     public RotationConfig Rotation { get; set; } = new();
+
+    /// <summary>
+    /// Per-monitor overrides, keyed by the monitor's device path as Windows reports it.
+    /// <c>"*"</c> is a documented catch-all. Unknown monitors are preserved on save so a docked
+    /// screen's assignment survives being undocked.
+    /// </summary>
+    public Dictionary<string, string> PerMonitor { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>none | crossfade. Collapses to none when reduced motion is on.</summary>
+    public string Transition { get; set; } = "crossfade";
+}
+
+/// <summary>The shell's own layer behind the desktop icons: clock, visualiser, wallpaper cross-fade.</summary>
+public sealed class BackgroundConfig
+{
+    /// <summary>
+    /// Off by default. It is a full-screen window attached to Explorer's wallpaper host; users who
+    /// want a second background layer opt into it rather than discovering it one morning.
+    /// </summary>
+    public bool Enabled { get; set; } = false;
+
+    public bool Clock { get; set; } = true;
+
+    /// <summary>Audio spectrum under the clock. Drawn only while something is actually playing.</summary>
+    public bool Visualiser { get; set; } = true;
+
+    /// <summary>0..0.8 black wash over the image, so a clock stays readable on a bright photo.</summary>
+    public double Dim { get; set; } = 0.25;
 }
 
 public sealed class RotationConfig

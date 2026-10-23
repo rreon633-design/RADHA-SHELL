@@ -56,8 +56,8 @@ Legend: **✅ parity** · **⚠️ partial** · **❌ not implemented** · **—
 | Area picker (region screenshot) | ❌ | none |
 | Screen recording | ❌ | none |
 | Window info / preview on hover | ❌ | none |
-| Desktop clock + background visualiser | ❌ | `AudioService.GetSpectrum` exists; nothing renders it |
-| Wallpaper transition animations | ❌ | 3 shaders compiled, 0 wired |
+| Desktop clock + background visualiser | ✅ | `BackgroundWindow` parented into Explorer's WorkerW — icon-safe, click-through, parks the 30 Hz timer when silent |
+| Wallpaper transition animations | ⚠️ | composition cross-fade driven by `MotionTokens`; the HLSL morph still unused |
 
 ### Services
 
@@ -74,7 +74,7 @@ Legend: **✅ parity** · **⚠️ partial** · **❌ not implemented** · **—
 | System monitor (CPU, GPU, RAM, disk, net, temps) | ✅ | LibreHardwareMonitor |
 | Disk / network usage history | ⚠️ | current values only, no history |
 | Colours (`matugen`/smart scheme) | ✅ | own OKLab engine, 6 M3 variants |
-| Wallpapers (picker, random, per-monitor) | ⚠️ | set/next; no picker grid, no per-monitor |
+| Wallpapers (picker, random, per-monitor) | ✅ | thumbnail grid, `IDesktopWallpaper` per-monitor assignment, span/fit placement, rotation |
 | Screens (`Screens.qml` — refresh rate, scale) | ❌ | none |
 | Idle / idle-inhibit / auto-lock | ⚠️ | inhibit policy + `SetThreadExecutionState`; auto-lock excluded by instruction |
 | Session manager | ⚠️ | power actions only |

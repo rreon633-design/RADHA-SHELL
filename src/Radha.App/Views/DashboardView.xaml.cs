@@ -8,6 +8,9 @@ public sealed partial class DashboardView : UserControl
 {
     public DashboardView() => InitializeComponent();
 
+    /// <summary>The wallpaper tab, configured by the host once services exist.</summary>
+    public WallpaperPickerView Picker => WallpaperPicker;
+
     private void OnTileClick(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { DataContext: TileViewModel tile })

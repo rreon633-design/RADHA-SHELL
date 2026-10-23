@@ -48,7 +48,7 @@ Every project is compiled here. Only one step in the whole pipeline is Windows-l
 
 | Area | State | Evidence |
 |---|---|---|
-| `Radha.Core` — palette engine, wallpaper decoding, config (+migrations/doctor), IPC protocol, command catalog, launcher engine, notifications, power rules, lyrics, i18n, diagnostics, security, performance | ✅ **built + tested** | **427 assertions, 0 failures**; 5 benchmark budgets green |
+| `Radha.Core` — palette engine, wallpaper decoding, config (+migrations/doctor), IPC protocol, command catalog, launcher engine, notifications, power rules, lyrics, i18n, diagnostics, security, performance | ✅ **built + tested** | **504 assertions, 0 failures**; 5 benchmark budgets green |
 | `radha` CLI — palette extraction, command surface, IPC client | ✅ **built + tested** | runs offline for `scheme extract` |
 | `Radha.App` — WinUI 3 bar / dashboard / launcher / control centre / notifications / OSD / session | ✅ **compiles and ships** | `xaml-audit` (0 findings, XA0–XA14) + `app-typecheck` (27 files) + **`winui` builds the shell on windows-latest**; every green `main` publishes a `RadhaShell-win-x64.zip` |
 | `Radha.Native` — AppBar dock, blur, global hotkeys, VD stubs | ✅ **compiled + linked** | 5 files clean under `clang++ -Werror`; `RadhaNative.dll` (PE32+ x86-64) exports all 14 symbols |
@@ -106,6 +106,11 @@ RADHA SHELL — core test suite
 ```
 
 ```text
+$ radha wallpaper monitors
+[{"id":"\\?\DISPLAY#DELA04A5#5&2f1f8e3&0&UID4353#{...}","name":"DELA04A5 (5&2f1f8e3&0&UID4353)","isPrimary":true}]
+
+$ radha wallpaper assign '\\?\DISPLAY#DELA04A5#...#{...}' "C:\Pictures\Wallpapers\aurora.png"
+
 $ radha scheme extract wallpaper.png
 RADHA SHELL · palette from wallpaper.png (64×64)
 seed #7C5CFF   variant TonalSpot   dark

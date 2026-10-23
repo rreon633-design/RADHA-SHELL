@@ -21,6 +21,7 @@ SIMPLE = {
     "TextBox": "Microsoft.UI.Xaml.Controls.TextBox",
     "Pivot": "Microsoft.UI.Xaml.Controls.Pivot",
     "ListView": "Microsoft.UI.Xaml.Controls.ListView",
+    "GridView": "Microsoft.UI.Xaml.Controls.GridView",
     "Slider": "Microsoft.UI.Xaml.Controls.Slider",
     "ComboBox": "Microsoft.UI.Xaml.Controls.ComboBox",
     "FontIcon": "Microsoft.UI.Xaml.Controls.FontIcon",

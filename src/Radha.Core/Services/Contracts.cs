@@ -173,7 +173,25 @@ public interface IWallpaperService
     IReadOnlyList<string> ListWallpapers();
     Task<RgbSeed> SetAsync(string path);
     Task<RgbSeed> NextAsync();
+
+    /// <summary>Every monitor Windows will accept a wallpaper for, primary first.</summary>
+    IReadOnlyList<DisplayTarget> Monitors { get; }
+
+    /// <summary>Sets one monitor's background. <paramref name="monitorId"/> is a device path.</summary>
+    Task<RgbSeed> SetForMonitorAsync(string monitorId, string path);
+
+    /// <summary>Raised with the new path after any successful change.</summary>
+    event EventHandler<string>? Changed;
+
+    /// <summary>Current placement mode, as a config string.</summary>
+    string Fit { get; }
+
+    /// <summary>Changing placement is a registry write, not a decode; false means "unknown mode".</summary>
+    bool SetFit(string fit);
 }
+
+/// <summary>One monitor the wallpaper layer can address.</summary>
+public readonly record struct DisplayTarget(string Id, string Name, bool IsPrimary);
 
 /// <summary>Seed colour produced by decoding a wallpaper (kept free of UI types).</summary>
 public readonly record struct RgbSeed(byte R, byte G, byte B);

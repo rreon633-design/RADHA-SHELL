@@ -44,6 +44,10 @@ public sealed partial class OverlayWindow : Window
         SyncVisibility();
     }
 
+    /// <summary>Wires the wallpaper tab; called by the host after the overlay is constructed.</summary>
+    public void ConfigureWallpaper(Radha.Core.Services.IWallpaperService wallpaper, Radha.Core.Config.ShellConfig config) =>
+        Dashboard.Picker.Configure(wallpaper, config);
+
     private void ConfigureWindow()
     {
         _appWindow = AppWindow.GetFromWindowId(Win32Interop.GetWindowIdFromWindow(WindowNative.GetWindowHandle(this)));
