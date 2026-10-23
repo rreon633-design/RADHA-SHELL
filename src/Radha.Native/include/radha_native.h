@@ -27,8 +27,13 @@ RADHA_API BOOL  RadhaHotkeyRegister(int id, UINT modifiers, UINT virtualKey);
 RADHA_API BOOL  RadhaHotkeyUnregister(int id);
 RADHA_API void  RadhaHotkeySetPipeEndpoint(LPCWSTR pipeName);
 
-// ---- virtual desktops (undocumented COM, guarded) ----
-RADHA_API int  RadhaWorkspaceCount();
-RADHA_API int  RadhaWorkspaceCurrent();
+// ---- virtual desktops ----
+// Real switching through the shell's IVirtualDesktopManagerInternal, version-dispatched per
+// Windows build (see src/Workspaces.cpp). Everything reports "unsupported" rather than guessing
+// when the running build has no verified layout.
+RADHA_API int  RadhaWorkspaceBuild();        // OS build number (e.g. 26100), 0 if unknown
+RADHA_API int  RadhaWorkspaceBackend();      // 0 = unsupported/unavailable, 1 = internal COM live
+RADHA_API int  RadhaWorkspaceCount();        // desktop count, 0 = unsupported
+RADHA_API int  RadhaWorkspaceCurrent();      // 0-based current desktop, -1 = unsupported
 RADHA_API BOOL RadhaWorkspaceSwitch(int index);
-RADHA_API BOOL RadhaWorkspaceMoveActiveWindow(int index);
+RADHA_API BOOL RadhaWorkspaceMoveActiveWindow(int index); // moves the foreground window

@@ -27,7 +27,7 @@ described. "Written but not verified" is called out explicitly in the README sta
 - [ ] Composition spring animations for panel open/close and pill morphing
       (`ScalarNaturalMotionAnimation`, expression animations)
 - [ ] Wire HLSL effects through `CompositionEffectBrush` (compile `.cso` in CI)
-- [ ] Virtual desktops: `IVirtualDesktopManagerInternal` with version dispatch, behind the
+- [x] Virtual desktops: `IVirtualDesktopManagerInternal` with version dispatch, behind the
       existing `IWorkspaceService` contract
 - [ ] Global hotkeys shipped with the app (auto-load `RadhaNative.dll`)
 - [ ] System toast mirroring (MSIX identity + `UserNotificationListener`)

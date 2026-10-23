@@ -22,11 +22,19 @@ XAML is written defensively (no `ElementName` bindings inside templates, item-le
 `IVirtualDesktopManagerInternal`, an undocumented COM interface whose IID changes across Windows
 builds.
 
-**Decision:** do not ship a hard-coded vtable that silently corrupts on the next feature update.
-`WorkspaceService` implements the documented contract with local workspace pills; the native bridge
-returns "unsupported" for the undocumented calls.
+**Decision:** ship the real thing, but never a single hard-coded vtable. `Radha.Native` carries a
+table of layouts, each pinned to the builds it was verified on (Win10 10240–19045, Win11 22000–22635,
+Win11 26100+), and identifies which one is live by the IID it successfully queries — then validates
+with `GetCount` before any further call. A build with no verified layout reports "unsupported" and
+the bar keeps labelled placeholder pills rather than pretending.
 
-**Path forward:** version-dispatched COM implementation in phase 2, behind the existing interface.
+Moves use the *documented* `IVirtualDesktopManager::MoveWindowToDesktop`, fed a GUID that came from
+the internal interface — so only enumeration and switching are undocumented.
+
+**Verified by:** `RadhaNativeSmoke.exe` on every push (see [`VIRTUAL-DESKTOPS.md`](VIRTUAL-DESKTOPS.md)).
+**Residual risk:** a future Windows release that reuses an old IID with a different layout. The IID
+gate cannot catch that; `GetCount` sanity-checking bounds the damage, and the smoke test fails loudly
+on a desktop session.
 
 ## 19.3 System toast mirroring
 

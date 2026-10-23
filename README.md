@@ -53,7 +53,7 @@ Every project is compiled here. Only one step in the whole pipeline is Windows-l
 | `Radha.App` — WinUI 3 bar / dashboard / launcher / control centre / notifications / OSD / session | ✅ **compiles and ships** | `xaml-audit` (0 findings, XA0–XA14) + `app-typecheck` (27 files) + **`winui` builds the shell on windows-latest**; every green `main` publishes a `RadhaShell-win-x64.zip` |
 | `Radha.Native` — AppBar dock, blur, global hotkeys, VD stubs | ✅ **compiled + linked** | 5 files clean under `clang++ -Werror`; `RadhaNative.dll` (PE32+ x86-64) exports all 14 symbols |
 | `Radha.Shaders` — Blur / Morph / Grain | ✅ **compiled** | 3/3 → DXIL via `dxc -T ps_6_0`; not yet wired into the app |
-| Virtual desktop switching | ❌ **not implemented** | needs undocumented `IVirtualDesktopManagerInternal`; deliberately stubbed, not faked |
+| Virtual desktop switching | ✅ **implemented (undocumented COM, per-build)** | `IVirtualDesktopManagerInternal` with three verified vtable layouts: Win10 10240–19045, Win11 22000–22635, Win11 26100+. Switch, count and current are live; window moves use the *documented* `MoveWindowToDesktop`. Builds with no verified layout report *unsupported* instead of guessing — see [`docs/VIRTUAL-DESKTOPS.md`](docs/VIRTUAL-DESKTOPS.md) |
 | System toast mirroring | ❌ **not implemented** | needs MSIX identity + `userNotificationListener`; local store works |
 | VPN toggling, Bluetooth device list | ❌ **not implemented** | needs stored RAS/VPN profile + device enumeration |
 | **Lock screen** | ❌ **not built — excluded on request** | no credential provider, no lock UI, no auth code in this repo |

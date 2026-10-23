@@ -467,6 +467,37 @@ jobs:
           if (-not $dll) { throw "RadhaNative.dll was not produced" }
           Write-Host "built $($dll.FullName) ($([math]::Round($dll.Length/1kb)) KB)"
 
+          # The C# side P/Invokes these by name — a missing export is a silent runtime failure.
+          $dumpbin = Get-ChildItem "C:\Program Files\Microsoft Visual Studio" -Recurse -Filter dumpbin.exe -ErrorAction SilentlyContinue |
+                     Where-Object { $_.FullName -match 'Hostx64\\x64' } | Select-Object -First 1
+          $exports = & $dumpbin.FullName /nologo /exports $dll.FullName
+          $expected = @(
+            'RadhaAppBarRegister','RadhaAppBarSetPosition','RadhaAppBarUnregister',
+            'RadhaSetClickThrough','RadhaEnableBlurBehind','RadhaSetMica','RadhaSetTopMost',
+            'RadhaHotkeyRegister','RadhaHotkeyUnregister','RadhaHotkeySetPipeEndpoint',
+            'RadhaWorkspaceBuild','RadhaWorkspaceBackend','RadhaWorkspaceCount',
+            'RadhaWorkspaceCurrent','RadhaWorkspaceSwitch','RadhaWorkspaceMoveActiveWindow')
+          $missing = $expected | Where-Object { $exports -notmatch "\b$_\b" }
+          if ($missing) {
+            $missing | ForEach-Object { Write-Host "::error::missing export $_" }
+            throw "$($missing.Count) export(s) missing"
+          }
+          Write-Host "all $($expected.Count) exports present"
+
+      # Real runtime check: loads the DLL and drives the virtual-desktop ABI on actual Windows.
+      - name: Virtual desktop smoke test
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem build -Recurse -Filter RadhaNativeSmoke.exe | Select-Object -First 1
+          if (-not $exe) { throw "RadhaNativeSmoke.exe was not produced" }
+          $dllDir = Split-Path (Get-ChildItem build -Recurse -Filter RadhaNative.dll | Select-Object -First 1).FullName
+          Copy-Item (Join-Path $dllDir 'RadhaNative.dll') (Split-Path $exe.FullName) -Force
+          & $exe.FullName
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::error::virtual desktop smoke test failed (exit $LASTEXITCODE)"
+            exit $LASTEXITCODE
+          }
+
       - name: Upload bridge
         uses: actions/upload-artifact@v4
         with:

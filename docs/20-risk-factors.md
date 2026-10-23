@@ -5,7 +5,7 @@ Likelihood: L/M/H · Impact: L/M/H · Score = rough product.
 | # | Risk | Likelihood | Impact | Score | Mitigation | Status |
 |---|---|---|---|---|---|---|
 | R1 | WinUI code fails to compile on first Windows build | H | M | H | `winui` CI job exists; core logic split out and tested; defensive XAML | 🟡 open |
-| R2 | Virtual desktop COM breaks across Windows builds | H | M | H | documented contract + local fallback; no undocumented vtable shipped | 🟡 open |
+| R2 | Virtual desktop COM breaks across Windows builds | H | M | H | per-build vtable table, IID-identified, probe-validated with GetCount; unverified builds report unsupported; documented MoveWindowToDesktop for moves; `RadhaNativeSmoke` runs on every push | 🟢 mitigated |
 | R3 | System toast listener needs MSIX identity | H | L | M | notification centre works without it; documented as ⬜ | 🟡 open |
 | R4 | Sensor coverage gaps on laptops | M | L | L | provider label + graceful zeros | 🟡 open |
 | R5 | App-bar leaves dead strip / mispositions | M | M | M | native isolation + fallback path; verify on multi-monitor | 🟡 open |

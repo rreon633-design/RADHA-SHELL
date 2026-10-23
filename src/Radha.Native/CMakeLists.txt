@@ -36,3 +36,10 @@ target_link_libraries(RadhaNative PRIVATE
 )
 
 set_target_properties(RadhaNative PROPERTIES OUTPUT_NAME "RadhaNative")
+
+# Runtime smoke test for the C ABI. Exercises the virtual-desktop entry points against the real
+# shell on CI; asserts the unsupported path degrades cleanly instead of faulting.
+add_executable(RadhaNativeSmoke tests/smoke.cpp)
+target_link_libraries(RadhaNativeSmoke PRIVATE RadhaNative)
+target_compile_definitions(RadhaNativeSmoke PRIVATE UNICODE _UNICODE)
+set_target_properties(RadhaNativeSmoke PROPERTIES OUTPUT_NAME "RadhaNativeSmoke")

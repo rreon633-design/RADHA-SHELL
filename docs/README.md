@@ -61,3 +61,5 @@ The complete product/engineering documentation set, matching the PRD table of co
 New to the project: **1 → 2 → 5 → 6 → 8 → 13**.
 Reviewing security: **11 → 17 → 19 → 20**.
 Deciding whether to adopt it: **21 → 8 → 19 → 23**.
+
+- [`VIRTUAL-DESKTOPS.md`](VIRTUAL-DESKTOPS.md) — per-build COM dispatch for desktop switching

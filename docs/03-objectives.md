@@ -18,7 +18,7 @@ Status legend: ✅ implemented and verified · 🟡 implemented, awaiting Window
 | O12 | Performance gates in CI | `bench --gate` fails on p95 regression | ✅ | `.github/workflows/ci.yml` |
 | O13 | Native bridge (app bar, hotkeys, DWM) | builds with MSVC, exports stable C ABI | 🟡 | `src/Radha.Native` |
 | O14 | HLSL effects | 3 shaders compile with `fxc` | 🟡 | `src/Radha.Shaders` |
-| O15 | Virtual desktop integration | switch desktops from the bar | ⬜ | needs `IVirtualDesktopManagerInternal` |
+| O15 | Virtual desktop integration | switch desktops from the bar | ✅ | `IVirtualDesktopManagerInternal`, per-build vtable dispatch + runtime probe |
 | O16 | System toast mirroring | show Windows toasts in our centre | ⬜ | needs MSIX identity + `UserNotificationListener` |
 | O17 | Lock screen | — | ❌ excluded by request | not in scope |
 
