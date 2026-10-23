@@ -55,6 +55,16 @@ LD_LIBRARY_PATH=<dxc-linux>/lib <dxc-linux>/bin/dxc -T ps_6_0 -E main -Fo Blur.d
 
 The Windows job uses `fxc /T ps_5_0`; the source compiles under both without changes.
 
+## Windows App SDK 1.8 or newer — a hard requirement
+
+`Microsoft.WindowsAppSDK` is pinned to **1.8.x**. Do not drop back to 1.6 or 1.7: on those
+versions `XamlCompiler.exe` writes its diagnostics only on success
+([microsoft-ui-xaml#9813](https://github.com/microsoft/microsoft-ui-xaml/issues/9813),
+[#10027](https://github.com/microsoft/microsoft-ui-xaml/issues/10027)), so any XAML error
+surfaces as a bare `MSB3073 ... exited with code 1` with no file, line, or message — and no
+`output.json`. The fix landed in **1.8.8** (and 2.1.3 on the 2.x line). 1.8 is also the first line
+with first-class .NET 9 support, which this project targets.
+
 ## Windows prerequisites
 
 - Windows 10 1809 (17763) or newer, Windows 11 recommended
@@ -68,8 +78,8 @@ The Windows job uses `fxc /T ps_5_0`; the source compiles under both without cha
 Restore is limited to these packages (versions in `Radha.App.csproj`):
 
 ```
-Microsoft.WindowsAppSDK        1.6.250228001
-Microsoft.Windows.SDK.BuildTools 10.0.26100.1742
+Microsoft.WindowsAppSDK        1.8.260921001
+Microsoft.Windows.SDK.BuildTools 10.0.26100.4654
 CommunityToolkit.Mvvm          8.4.0
 Microsoft.Extensions.DependencyInjection 9.0.0
 Microsoft.Graphics.Win2D       1.3.2
@@ -145,7 +155,7 @@ Not wired into the app yet — phase 1 uses DWM acrylic/Mica.
 
 | Symptom | Fix |
 |---|---|
-| `WindowsAppSDK` restore fails | update the version to the latest 1.6.x on nuget.org |
+| `WindowsAppSDK` restore fails | update the version to the latest 1.8.x on nuget.org |
 | `XamlCompiler error WMC1006` | open the solution once in VS so the WinUI targets are registered |
 | App starts then exits immediately | an exception in `OnLaunched`; run under the debugger |
 | Acrylic looks solid grey | transparency disabled by *Settings → Personalisation → Colours*, or on battery saver |
