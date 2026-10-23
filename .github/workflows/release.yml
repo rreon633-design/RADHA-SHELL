@@ -67,9 +67,27 @@ jobs:
           dotnet-version: 9.0.x
 
       - name: Run core tests before shipping
+        shell: pwsh
         run: |
-          dotnet build src/Radha.Tests/Radha.Tests.csproj -c Release
-          dotnet run --project src/Radha.Tests -c Release --no-build
+          $log = Join-Path $env:RUNNER_TEMP 'tests.log'
+          dotnet build src/Radha.Tests/Radha.Tests.csproj -c Release -v:q 2>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) {
+            $be = @(Select-String -Path $log -Pattern ': error ' | ForEach-Object { $_.Line.Trim() } | Select-Object -Unique)
+            $be | Select-Object -First 15 | ForEach-Object { Write-Host "::error::$_" }
+            Write-Host "::error::tests failed to build"; exit 1
+          }
+          dotnet run --project src/Radha.Tests -c Release --no-build 2>&1 | Tee-Object -FilePath $log -Append
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            $fails = @(Select-String -Path $log -Pattern 'FAIL ' | ForEach-Object { $_.Line.Trim() } | Select-Object -Unique)
+            $fails | Select-Object -First 15 | ForEach-Object {
+              $m = $_.Replace('%','%25').Replace([string][char]13,'').Replace([string][char]10,'%0A')
+              Write-Host "::error::$m"
+            }
+            $sum = @(Select-String -Path $log -Pattern 'passed, .* failed' | Select-Object -Last 1)
+            Write-Host "::error::test suite exited $code ($($sum.Line.Trim()))"
+            exit $code
+          }
 
       - name: Publish WinUI shell
         shell: pwsh
