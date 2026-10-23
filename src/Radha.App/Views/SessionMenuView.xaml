@@ -21,36 +21,44 @@
                 </StackPanel>
             </StackPanel>
 
-            <UniformGrid Columns="2" Rows="2">
-                <Button Click="OnLogout" Margin="3" Padding="12" CornerRadius="14" BorderThickness="0"
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Button Grid.Row="0" Grid.Column="0" Click="OnLogout" Margin="3" Padding="12" CornerRadius="14" BorderThickness="0"
                         Background="{Binding Theme.SurfaceContainerHigh}" HorizontalContentAlignment="Left">
                     <StackPanel Spacing="6">
                         <FontIcon Glyph="&#xE77B;" FontSize="15" Foreground="{Binding Theme.Primary}" />
                         <TextBlock Text="Sign out" FontSize="10.5" Foreground="{Binding Theme.OnSurface}" />
                     </StackPanel>
                 </Button>
-                <Button Click="OnSuspend" Margin="3" Padding="12" CornerRadius="14" BorderThickness="0"
+                <Button Grid.Row="0" Grid.Column="1" Click="OnSuspend" Margin="3" Padding="12" CornerRadius="14" BorderThickness="0"
                         Background="{Binding Theme.SurfaceContainerHigh}" HorizontalContentAlignment="Left">
                     <StackPanel Spacing="6">
                         <FontIcon Glyph="&#xE708;" FontSize="15" Foreground="{Binding Theme.Primary}" />
                         <TextBlock Text="Sleep" FontSize="10.5" Foreground="{Binding Theme.OnSurface}" />
                     </StackPanel>
                 </Button>
-                <Button Click="OnReboot" Margin="3" Padding="12" CornerRadius="14" BorderThickness="0"
+                <Button Grid.Row="1" Grid.Column="0" Click="OnReboot" Margin="3" Padding="12" CornerRadius="14" BorderThickness="0"
                         Background="{Binding Theme.SurfaceContainerHigh}" HorizontalContentAlignment="Left">
                     <StackPanel Spacing="6">
                         <FontIcon Glyph="&#xE777;" FontSize="15" Foreground="{Binding Theme.Primary}" />
                         <TextBlock Text="Restart" FontSize="10.5" Foreground="{Binding Theme.OnSurface}" />
                     </StackPanel>
                 </Button>
-                <Button Click="OnShutdown" Margin="3" Padding="12" CornerRadius="14" BorderThickness="0"
+                <Button Grid.Row="1" Grid.Column="1" Click="OnShutdown" Margin="3" Padding="12" CornerRadius="14" BorderThickness="0"
                         Background="{Binding Theme.SurfaceContainerHigh}" HorizontalContentAlignment="Left">
                     <StackPanel Spacing="6">
                         <FontIcon Glyph="&#xE7E8;" FontSize="15" Foreground="{Binding Theme.Error}" />
                         <TextBlock Text="Shut down" FontSize="10.5" Foreground="{Binding Theme.OnSurface}" />
                     </StackPanel>
                 </Button>
-            </UniformGrid>
+            </Grid>
         </StackPanel>
     </Border>
 </UserControl>

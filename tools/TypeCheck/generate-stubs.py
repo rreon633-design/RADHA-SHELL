@@ -27,7 +27,6 @@ SIMPLE = {
     "ItemsControl": "Microsoft.UI.Xaml.Controls.ItemsControl",
     "ItemsRepeater": "Microsoft.UI.Xaml.Controls.ItemsRepeater",
     "UserControl": "Microsoft.UI.Xaml.Controls.UserControl",
-    "Grid+Canvas": "Microsoft.UI.Xaml.Controls.Canvas",
 }
 
 def type_for(el, prefixes):

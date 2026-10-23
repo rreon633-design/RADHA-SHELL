@@ -1,3 +1,5 @@
+using System.Reflection.Metadata;
+using System.Reflection.PortableExecutable;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
@@ -18,6 +20,9 @@ namespace XamlAudit;
 ///   XA9  ResourceDictionary Source pointing at a missing file
 ///   XA10 x:Bind (requires the Windows XAML compiler; forbidden by project policy)
 ///   XA11 XAML file with no code-behind
+//   XA12 deep binding path member resolution
+//   XA13 element type exists in the WinUI projection (catches WPF/UWP-only controls
+//        such as UniformGrid that only the real XAML compiler would reject)
 /// </summary>
 public static class Program
 {
@@ -65,10 +70,52 @@ public static class Program
     private static readonly Regex LocalOrParam = new(
         @"\bvar\s+([A-Za-z_][A-Za-z0-9_]*)|\(\s*[A-Za-z_][A-Za-z0-9_<>,\.\?]*\s+([A-Za-z_][A-Za-z0-9_]*)\s*\)", RegexOptions.Compiled);
 
+
+    /// <summary>
+    /// Reads every public type name in the WinUI projection so XAML elements can be checked
+    /// against the real API surface. Without the assembly the check is skipped, not failed.
+    /// </summary>
+    private static HashSet<string>? LoadWinUiTypes(string? explicitPath)
+    {
+        var path = explicitPath;
+        if (path is null)
+        {
+            var nuget = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages");
+            if (Directory.Exists(nuget))
+            {
+                path = Directory
+                    .EnumerateFiles(nuget, "Microsoft.WinUI.dll", SearchOption.AllDirectories)
+                    .Where(f => f.Contains("windowsappsdk", StringComparison.OrdinalIgnoreCase))
+                    .Where(f => f.Contains($"{Path.DirectorySeparatorChar}lib{Path.DirectorySeparatorChar}"))
+                    .OrderByDescending(f => f, StringComparer.Ordinal)
+                    .FirstOrDefault();
+            }
+        }
+
+        if (path is null || !File.Exists(path)) return null;
+
+        using var stream = File.OpenRead(path);
+        using var pe = new PEReader(stream);
+        if (!pe.HasMetadata) return null;
+        var md = pe.GetMetadataReader();
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var handle in md.TypeDefinitions)
+        {
+            var type = md.GetTypeDefinition(handle);
+            var ns = md.GetString(type.Namespace);
+            if (!ns.StartsWith("Microsoft.UI.Xaml", StringComparison.Ordinal)) continue;
+            names.Add(md.GetString(type.Name));
+        }
+        return names;
+    }
+
     public static int Main(string[] args)
     {
         var root = args.FirstOrDefault(a => !a.StartsWith("--")) ?? FindRepoRoot();
         var verbose = args.Contains("--verbose");
+        var winuiArg = args.SkipWhile(a => a != "--winui").Skip(1).FirstOrDefault();
+        var winuiTypes = LoadWinUiTypes(winuiArg);
 
         if (root is null || !Directory.Exists(Path.Combine(root, "src", "Radha.App")))
         {
@@ -328,6 +375,21 @@ public static class Program
                 }
             }
 
+            // XA13 — every unprefixed element must be a real type in the WinUI projection.
+            // The XAML compiler rejects unknown types with WMC0001; this catches the same class
+            // of mistake on Linux (e.g. UniformGrid, which is WPF-only and does not exist in WinUI 3).
+            if (winuiTypes is not null)
+            {
+                var stripped = Regex.Replace(source, "<!--.*?-->", " ", RegexOptions.Singleline);
+                foreach (Match element in Regex.Matches(stripped, @"<([A-Za-z_][A-Za-z0-9_]*)(?=[\s/>])"))
+                {
+                    var name = element.Groups[1].Value;
+                    if (winuiTypes.Contains(name)) continue;
+                    findings.Add(new Finding("XA13", relative,
+                        $"<{name}> is not a type in the WinUI projection — the XAML compiler will reject it (WMC0001)"));
+                }
+            }
+
             // XA9 — ResourceDictionary sources
             foreach (Match match in Regex.Matches(source, @"Source=""ms-appx:///([^""]+)"""))
             {
@@ -368,7 +430,7 @@ public static class Program
 
         if (findings.Count == 0)
         {
-            Console.WriteLine("no findings — every x:Class, handler, resource key, binding root, namespace and element resolves");
+            Console.WriteLine("no findings — every x:Class, handler, resource key, binding root, namespace and element type resolves");
             return 0;
         }
 
