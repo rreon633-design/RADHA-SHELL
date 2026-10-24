@@ -40,6 +40,11 @@ public static class Program
             return RunSelfTest(ArgumentAfter(args, "--out")
                                ?? Path.Combine(Path.GetTempPath(), "radha-selftest.json"));
 
+        // Child-process probe for the native virtual-desktop bridge. Runs before any XAML, prints
+        // one JSON line and exits; the parent reads it and decides whether to touch the bridge.
+        if (HasFlag(args, "--probe-desktops"))
+            return Interop.WorkspaceProbe.RunChild();
+
         if (HasFlag(args, "--diagnose"))
             return RunDiagnose(ArgumentAfter(args, "--out")
                                ?? Path.Combine(Path.GetTempPath(), "radha-diagnose.txt"));

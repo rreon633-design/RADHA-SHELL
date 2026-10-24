@@ -19,40 +19,69 @@ namespace Radha.App.Services.Win;
 public sealed class WorkspaceService : IWorkspaceService, IDisposable
 {
     private readonly List<WorkspaceInfo> _workspaces = new();
-    private readonly System.Threading.Timer? _poll;
-    private readonly bool _live;
+    private System.Threading.Timer? _poll;
+    private bool _live;
+    private bool _probeStarted;
+    private string? _probeError;
+    private readonly object _probeGate = new();
     private int _active = -1;
 
     /// <summary>True when the native bridge is driving real Windows virtual desktops.</summary>
     public bool IsLive => _live;
 
     /// <summary>Build the bridge resolved (e.g. 26100), or 0 when unknown.</summary>
-    public int WindowsBuild { get; }
+    public int WindowsBuild { get; private set; }
 
     public string BackendLabel => _live
         ? $"Windows virtual desktops · build {WindowsBuild}"
-        : "Virtual desktops unavailable on this build — showing local placeholders";
+        : _probeError is { Length: > 0 } reason
+            ? $"Virtual desktops unavailable — {reason}"
+            : "Virtual desktops unavailable on this build — showing local placeholders";
 
     public IReadOnlyList<WorkspaceInfo> Workspaces => _workspaces;
     public event EventHandler? Changed;
 
     public WorkspaceService(int fallbackCount = 5)
     {
-        _live = NativeBridge.TryProbe(out var build);
-        WindowsBuild = build;
+        // No native call here, deliberately. The bridge talks to an undocumented COM interface, and
+        // a wrong vtable layout for the running build is an access violation — uncatchable on .NET,
+        // fatal to the process. It is probed in a child process from EnsureProbed below.
+        for (var i = 0; i < Math.Max(1, fallbackCount); i++)
+            _workspaces.Add(new WorkspaceInfo(i, $"Workspace {i + 1}", i == 0, i < 2, 0));
+        _active = 0;
+    }
 
-        if (!_live)
+    /// <summary>
+    /// Asks the bridge whether this build is supported, off the startup path, and upgrades from the
+    /// labelled preview only when the answer is yes. Safe to call more than once.
+    /// </summary>
+    public void EnsureProbed()
+    {
+        if (_probeStarted) return;
+        lock (_probeGate)
         {
-            // Honest preview: the pills still work as UI state, but they are not Windows desktops.
-            for (var i = 0; i < Math.Max(1, fallbackCount); i++)
-                _workspaces.Add(new WorkspaceInfo(i, $"Workspace {i + 1}", i == 0, i < 2, 0));
-            _active = 0;
+            if (_probeStarted) return;
+            _probeStarted = true;
+        }
+
+        var result = Interop.WorkspaceProbe.Get();
+        if (!result.Live)
+        {
+            _probeError = result.Error;
             return;
         }
 
-        Refresh();
+        lock (_probeGate)
+        {
+            _live = true;
+            WindowsBuild = result.Build;
+            _workspaces.Clear();
+            Refresh();
+        }
+
         // Desktops can change outside the shell (Win+Ctrl+Arrow, task view); keep in step.
         _poll = new System.Threading.Timer(_ => Refresh(), null, 1500, 1500);
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>Reads count + current index from the bridge. Safe to call from any thread.</summary>

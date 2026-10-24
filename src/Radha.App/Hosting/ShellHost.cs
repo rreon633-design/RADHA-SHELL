@@ -83,6 +83,7 @@ public sealed class ShellHost : IAsyncDisposable
 
     public ShellHost()
     {
+        Program.Smoke?.Stage("config");
         _configStore = new ConfigStore();
         _config = _configStore.Load();
 
@@ -100,6 +101,7 @@ public sealed class ShellHost : IAsyncDisposable
         services.AddSingleton<IVpnService, VpnService>();
         services.AddSingleton<IWorkspaceService>(_ => new WorkspaceService(_config.Bar.WorkspaceCount));
         services.AddSingleton<IDisplayService, DisplayService>();
+        Program.Smoke?.Stage("di");
         _services = services.BuildServiceProvider();
 
         _theme = _services.GetRequiredService<IThemeService>();
@@ -119,6 +121,7 @@ public sealed class ShellHost : IAsyncDisposable
         _workspaces = _services.GetRequiredService<IWorkspaceService>();
         _displays = _services.GetRequiredService<IDisplayService>();
 
+        Program.Smoke?.Stage("theme");
         if (_theme is ThemeService themeService) themeService.Initialize(_config);
 
         _state = new ShellState(
@@ -128,6 +131,7 @@ public sealed class ShellHost : IAsyncDisposable
             _workspaces,
             _audio);
 
+        Program.Smoke?.Stage("state");
         _dashboard = new DashboardViewModel(_state, _system, _weather, _media, _audio, _theme);
         _launcher = new LauncherViewModel(_state, (module, command) => _ = ExecuteCommandAsync(module, command, Array.Empty<string>()));
         _controlCenter = new ControlCenterViewModel(
@@ -143,6 +147,7 @@ public sealed class ShellHost : IAsyncDisposable
             _bluetooth,
             _vpn);
 
+        Program.Smoke?.Stage("viewmodels");
         Bar = new BarWindow(_state, null, _config.Bar.Height, _config.Bar.ScrollActions);
         Overlay = new OverlayWindow(_state, _dashboard, _launcher, _controlCenter);
         Overlay.ConfigureWallpaper(_wallpaper, _config);
@@ -182,6 +187,10 @@ public sealed class ShellHost : IAsyncDisposable
         _clock.Start();
         await _dashboard.InitializeAsync();
         Program.Smoke?.Stage("dashboard");
+
+        // The virtual-desktop bridge is asked off the startup path, in a child process that is
+        // allowed to die: see WorkspaceProbe for why that is not paranoia.
+        _ = Task.Run(() => (_workspaces as WorkspaceService)?.EnsureProbed());
 
         StartSecondaryBars();
         Program.Smoke?.Stage("secondary-bars");
