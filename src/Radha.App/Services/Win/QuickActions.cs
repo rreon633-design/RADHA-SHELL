@@ -15,11 +15,19 @@ internal static class QuickActions
 {
     // ---------------- brightness (Dxva2, internal displays) ----------------
 
-    [StructLayout(LayoutKind.Sequential)]
+    /// <summary>
+    /// <c>PHYSICAL_MONITOR</c>: a handle followed by an inline <c>WCHAR[128]</c> description.
+    /// MarshalAs(UnmanagedType.LPWStr) on the description declares a pointer, so the OS wrote 256
+    /// bytes into an 8-byte field — heap corruption that killed the process before its first
+    /// window. ByValTStr with the real size is the shape of the C struct.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct PhysicalMonitor
     {
         public IntPtr Handle;
-        [MarshalAs(UnmanagedType.LPWStr)] public string Description;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+        public string Description;
     }
 
     [DllImport("dxva2.dll", SetLastError = true)]
@@ -50,23 +58,55 @@ internal static class QuickActions
     private const uint MonitorDefaultToPrimary = 1;
 
     /// <summary>
-    /// True when this machine exposes brightness control. Internal panels do; most external
-    /// monitors do not unless they implement DDC/CI and the vendor driver enables it.
+    /// Asks a child process what this machine can do with brightness.
+    ///
+    /// Dxva2 is a vendor DLL reached through a C ABI, and a mistake in that boundary is a native
+    /// access violation — uncatchable on .NET, fatal to the shell. The same probe that verified the
+    /// virtual-desktop bridge applies here: ask a process that is allowed to die. A crash costs one
+    /// disabled slider instead of the whole shell.
     /// </summary>
-    internal static bool BrightnessSupported { get; } = ProbeBrightness();
-
-    private static bool ProbeBrightness()
+    internal static (bool Supported, int Value) ProbeDisplay()
     {
-        if (!OperatingSystem.IsWindows()) return false;
+        var reply = Interop.ChildProbe.Run("--probe-display", TimeSpan.FromSeconds(8));
+        if (reply is null) return (false, -1);
+
         try
         {
-            using var physical = PhysicalMonitorHandle.Open();
-            return physical is not null;
+            using var document = System.Text.Json.JsonDocument.Parse(reply);
+            var root = document.RootElement;
+            var supported = root.GetProperty("supported").GetBoolean();
+            var value = root.GetProperty("brightness").GetInt32();
+            return (supported, value);
         }
         catch
         {
-            return false;
+            return (false, -1);
         }
+    }
+
+    /// <summary>Child side of <see cref="ProbeDisplay"/>: one JSON line, no XAML.</summary>
+    internal static int RunDisplayProbe()
+    {
+        var supported = false;
+        var value = -1;
+
+        try
+        {
+            using var physical = PhysicalMonitorHandle.Open();
+            if (physical is not null)
+            {
+                supported = GetMonitorBrightness(physical.Handle, out var min, out var current, out var max)
+                            && max > min;
+                if (supported) value = (int)Math.Round((current - min) * 100.0 / (max - min));
+            }
+        }
+        catch
+        {
+            supported = false;
+        }
+
+        Console.Out.WriteLine($"{{\"supported\":{(supported ? "true" : "false")},\"brightness\":{value}}}");
+        return 0;
     }
 
     /// <summary>Brightness 0–100, or -1 when nothing can report it.</summary>

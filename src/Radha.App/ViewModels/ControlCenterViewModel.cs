@@ -28,6 +28,7 @@ public sealed partial class ControlCenterViewModel : ObservableObject
     private readonly Action _openSettings;
     private readonly Action _openWallpaperPicker;
     private readonly Action _quit;
+    private readonly Microsoft.UI.Dispatching.DispatcherQueue? _dispatcher;
     private bool _initialized;
 
     [ObservableProperty] private double _volume;
@@ -78,7 +79,9 @@ public sealed partial class ControlCenterViewModel : ObservableObject
         _openWallpaperPicker = openWallpaperPicker;
         _quit = quit;
 
-        BrightnessAvailable = QuickActions.BrightnessSupported;
+        // Optimistic until the panel opens: the probe starts a child process, and the boot path is
+        // not the place for one (see WorkspaceProbe for what a native call on that path costs).
+        BrightnessAvailable = true;
 
         Tiles.Add(Tile("Wi-Fi", "\uE701", network.Current.Connected, true,
             network.Current.Connected ? "Connected" : "Off"));
@@ -107,20 +110,8 @@ public sealed partial class ControlCenterViewModel : ObservableObject
         VariantLabel = $"Material 3 · {SelectedVariant}";
         IsDark = theme.Current.IsDark;
 
-        if (BrightnessAvailable)
-        {
-            var current = QuickActions.GetBrightness();
-            if (current >= 0)
-            {
-                Brightness = current;
-                BrightnessText = $"{current}";
-            }
-        }
-        else
-        {
-            // No DDC/CI and no internal panel: the slider is real but disabled, and says why.
-            BrightnessText = "—";
-        }
+        BrightnessText = "—";
+        _dispatcher = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
 
         foreach (var tile in Tiles) tile.ApplyTheme(state.Theme);
 
@@ -322,7 +313,11 @@ public sealed partial class ControlCenterViewModel : ObservableObject
     [RelayCommand] private void OpenSettings() => _openSettings();
     [RelayCommand] private void Quit() => _quit();
 
-    /// <summary>Called by the host when the panel opens, so the mixers are never stale.</summary>
+    /// <summary>
+    /// Called by the host when the panel opens, so the mixers are never stale. This is also where
+    /// the display is probed: the answer costs a child process on the runner and a few milliseconds
+    /// on a laptop, and paying it once when the panel opens is cheaper than paying it on every boot.
+    /// </summary>
     public void Refresh()
     {
         Volume = _audio.Volume;
@@ -335,10 +330,19 @@ public sealed partial class ControlCenterViewModel : ObservableObject
         IsDark = _theme.Current.IsDark;
         SelectedVariant = _theme.Current.Variant.ToString(CultureInfo.InvariantCulture);
 
-        if (BrightnessAvailable)
+        // Off the UI thread: the probe is a process launch, and the panel should not wait for it.
+        _ = Task.Run(() =>
         {
-            var current = QuickActions.GetBrightness();
-            if (current >= 0) Brightness = current;
-        }
+            var (supported, value) = QuickActions.ProbeDisplay();
+            void Apply()
+            {
+                BrightnessAvailable = supported;
+                if (supported && value >= 0) Brightness = value;
+                else BrightnessText = "—";
+            }
+
+            if (_dispatcher is null) Apply();
+            else _dispatcher.TryEnqueue(Apply);
+        });
     }
 }

@@ -336,9 +336,15 @@ public sealed class ShellHost : IAsyncDisposable
                     ? Core.Launcher.Calculator.Format(value)
                     : "not a calculation";
 
+            case ShellModule.ControlCenter:
+                // The mixers and the display probe are refreshed on open, so what the panel shows
+                // is the state of the machine now rather than at boot.
+                _controlCenter.Refresh();
+                _state.ShowModule(module.ToString(), command, args);
+                return "ok";
+
             case ShellModule.Dashboard:
             case ShellModule.Launcher:
-            case ShellModule.ControlCenter:
             case ShellModule.Notifications:
             case ShellModule.Session:
             case ShellModule.Osd:

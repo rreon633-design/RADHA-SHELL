@@ -45,6 +45,11 @@ public static class Program
         if (HasFlag(args, "--probe-desktops"))
             return Interop.WorkspaceProbe.RunChild();
 
+        // Same reason as the desktop probe: Dxva2 is a C ABI, so the question is asked where a
+        // crash costs a disabled slider rather than the shell.
+        if (HasFlag(args, "--probe-display"))
+            return Services.Win.QuickActions.RunDisplayProbe();
+
         if (HasFlag(args, "--diagnose"))
             return RunDiagnose(ArgumentAfter(args, "--out")
                                ?? Path.Combine(Path.GetTempPath(), "radha-diagnose.txt"));
