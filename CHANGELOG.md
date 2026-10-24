@@ -4,6 +4,31 @@ All notable changes to RADHA SHELL are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning is
 [SemVer](https://semver.org/).
 
+## Unreleased — the exe actually opens now
+
+Three separate reasons a double-click produced no window, all found by making the release pipeline
+prove it:
+
+- **The resource index had the wrong name.** An unpackaged WinUI app loads `App.xaml` through
+  `resources.pri` and nothing else; MSBuild names it after the assembly, so the bundle shipped
+  `RadhaShell.pri` — a file no loader opens. `ProjectPriFileName` now sets the name the loader asks
+  for. The pipeline reads the bundle's own file table and fails if it is wrong.
+- **The Windows App SDK search path pointed at the wrong directory.** For a single-file bundle the
+  runtime lives in the `%TEMP%` extraction directory, not next to the executable. It is now resolved
+  from the runtime's own search list instead of `AppContext.BaseDirectory`.
+- **The virtual-desktop bridge was called during boot.** `RadhaNative.dll` uses an undocumented COM
+  interface whose vtable slot layout is matched to the Windows build; on a build with no verified
+  layout the call lands on an arbitrary address, and a native access violation is not catchable on
+  .NET. The shell died before its first window, silently. The bridge is now asked in a child process
+  that is allowed to die, and only after the bar is on screen.
+
+Silent failures are gone with them: every launch appends to `%APPDATA%\Radha\logs\startup.log`, a
+failed start shows a message box instead of vanishing, and `RadhaShell.exe --diagnose` prints the
+environment, the resolved runtime directory, the resource index and the VC++ runtime state.
+
+The release gate no longer trusts `--selftest` alone — it never reached XAML. A published binary is
+now started for real and must report a window with content before anything is uploaded.
+
 ## Unreleased — virtual desktops verified, not assumed
 
 - `RadhaNative.dll` builds clean under GCC with `-Wall -Wextra -Werror` as well as MSVC; the

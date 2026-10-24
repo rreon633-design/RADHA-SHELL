@@ -104,7 +104,11 @@ No registry keys, services or drivers are installed.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| Nothing appears | the shell is not running | run `RadhaShell.exe` |
+| Nothing appears on the first double-click | the single file is compressed and unpacks itself into `%TEMP%\.net` on first launch; a slow disk makes that a minute of nothing | wait once — later launches reuse the cache |
+| "Windows protected your PC" | the build is unsigned | More info → Run anyway, then compare against `SHA256SUMS.txt` |
+| Still nothing after a minute | a start-up failure the shell could not report | `RadhaShell.exe --diagnose --out diagnose.txt` and `%APPDATA%\Radha\logs\startup.log` name the stage it stopped at |
+| Bar up, no tray icon | Explorer restarted after the shell started | restart RadhaShell |
+| Virtual desktops say "unavailable" | no verified layout for this Windows build, or the native probe was stopped | the reason is printed on the pill; the rest of the bar keeps working |
 | `windows` CI job red | XAML/SDK drift | read the job log; the core still works |
 | Bar overlaps maximised windows | app bar not registered | ensure `RadhaNative.dll` is beside the exe |
 | No transparency | battery saver / transparency effects off | Settings → Personalisation → Colours |
