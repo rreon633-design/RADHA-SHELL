@@ -172,15 +172,23 @@ public sealed class ShellHost : IAsyncDisposable
     {
         App.MainWindowInstance = Bar;
         Bar.Activate();
+        Program.Smoke?.Stage("bar-activated");
+
         await ((GsmtcMediaService)_media).InitializeAsync();
+        Program.Smoke?.Stage("media");
         await _ipc.StartAsync();
+        Program.Smoke?.Stage("ipc");
 
         _clock.Start();
         await _dashboard.InitializeAsync();
+        Program.Smoke?.Stage("dashboard");
 
         StartSecondaryBars();
+        Program.Smoke?.Stage("secondary-bars");
         StartTray();
+        Program.Smoke?.Stage("tray");
         StartHotkeys();
+        Program.Smoke?.Stage("hotkeys");
         StartConfigWatcher();
         StartIdleWatch();
         _ = CheckForUpdatesAsync();
@@ -206,7 +214,7 @@ public sealed class ShellHost : IAsyncDisposable
             "radha",
             "RADHA SHELL",
             "Welcome back, " + Environment.UserName,
-            "Radha is running. Press the logo or run `radha dashboard toggle` to open the dashboard.",
+            "Radha is running. Press the logo in the bar, or Ctrl+Alt+D, to open the dashboard.",
             NotificationUrgency.Low,
             DateTimeOffset.Now,
             Array.Empty<string>()));

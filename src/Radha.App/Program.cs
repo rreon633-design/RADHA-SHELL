@@ -51,9 +51,11 @@ public static class Program
             Smoke = new SmokeProbe(outPath, TimeSpan.FromSeconds(timeout));
         }
 
+        Smoke?.Stage("com-wrappers");
         try
         {
             WinRT.ComWrappersSupport.InitializeComWrappers();
+            Smoke?.Stage("application-start");
             Application.Start(callbackParams =>
             {
                 var context = new DispatcherQueueSynchronizationContext(DispatcherQueue.GetForCurrentThread());
@@ -299,55 +301,52 @@ internal static class StartupLog
 
 /// <summary>
 /// Proves the thing <c>--selftest</c> cannot: that the packaged XAML, the resource index and the
-/// WinUI compositor all come up and a window exists. The verdict is written to a file and the
-/// process leaves immediately, so the exit code is deterministic rather than "whatever the message
-/// loop felt like doing".
+/// WinUI compositor all come up and a window exists.
+///
+/// The verdict is a file, and only a file. An earlier version exited the process the moment it knew
+/// the answer, which meant every release gate was really testing WinUI's shutdown path — and it
+/// reported heap corruption and an access violation on runs where the window had opened fine. A
+/// desktop shell is supposed to stay running anyway; the harness on the other side reads the file
+/// and stops the process.
 /// </summary>
 internal sealed class SmokeProbe
 {
     private readonly string _path;
+    private readonly string _timeoutText;
     private readonly Timer _deadline;
     private int _completed;
 
     internal SmokeProbe(string path, TimeSpan timeout)
     {
         _path = path;
+        _timeoutText = $"{timeout.TotalSeconds:0}s";
+        Stage("starting");
         _deadline = new Timer(_ => Fail("timeout", new TimeoutException(
-            $"No window after {timeout.TotalSeconds:0}s. The shell never finished starting.")),
+            $"No window after {_timeoutText}. The shell never finished starting.")),
             null, timeout, Timeout.InfiniteTimeSpan);
     }
 
-    /// <summary>Called once a window exists. Both the bar and its XAML tree are already built.</summary>
+    /// <summary>
+    /// Rewrites the report as startup advances, so a process that dies without a message still says
+    /// where it got to. Writing is deliberately dumb: open, truncate, close.
+    /// </summary>
+    internal void Stage(string stage)
+    {
+        if (Volatile.Read(ref _completed) != 0) return;
+        Write("running", stage, null);
+    }
+
+    /// <summary>Called once the shell is up: a window exists and its XAML tree is built.</summary>
     internal void Pass(string detail)
     {
         if (Interlocked.Exchange(ref _completed, 1) != 0) return;
         Write("pass", detail, null);
-
-        // Shut down through the XAML application, not ExitProcess. Tearing the process down from
-        // inside the message loop while composition objects are still alive is how a clean run
-        // reports STATUS_HEAP_CORRUPTION and a green test looks red.
-        try
-        {
-            Application.Current.Exit();
-        }
-        catch
-        {
-            Environment.Exit(0);
-        }
-
-        // If the loop does not unwind, the verdict is already on disk; leave rather than hang.
-        _ = Task.Run(async () =>
-        {
-            await Task.Delay(TimeSpan.FromSeconds(15)).ConfigureAwait(false);
-            Environment.Exit(0);
-        });
     }
 
     internal void Fail(string phase, Exception exception)
     {
         if (Interlocked.Exchange(ref _completed, 1) != 0) return;
         Write("fail", phase, exception);
-        Environment.Exit(2);
     }
 
     private void Write(string result, string detail, Exception? exception)
@@ -357,7 +356,7 @@ internal sealed class SmokeProbe
             var json = new StringBuilder()
                 .Append("{\n")
                 .Append("  \"result\": ").Append(Json(result)).Append(",\n")
-                .Append("  \"phase\": ").Append(Json(detail)).Append(",\n")
+                .Append("  \"stage\": ").Append(Json(detail)).Append(",\n")
                 .Append("  \"runtime\": ").Append(Json(RuntimeInformation.FrameworkDescription)).Append(",\n")
                 .Append("  \"baseDirectory\": ").Append(Json(AppContext.BaseDirectory)).Append(",\n")
                 .Append("  \"error\": ").Append(Json(exception?.ToString() ?? "")).Append('\n')
@@ -370,7 +369,7 @@ internal sealed class SmokeProbe
         }
         catch
         {
-            // The exit code still carries the verdict.
+            // The startup log below carries the same information.
         }
 
         StartupLog.Write($"smoke {result} ({detail})");

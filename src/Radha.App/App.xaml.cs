@@ -65,8 +65,11 @@ public partial class App : Application
     {
         try
         {
+            Program.Smoke?.Stage("ui");
             Ui.Initialize();
+            Program.Smoke?.Stage("host");
             _host = new ShellHost();
+            Program.Smoke?.Stage("start");
             await _host.StartAsync();
         }
         catch (Exception ex)
@@ -74,6 +77,7 @@ public partial class App : Application
             // Rethrowing here reaches nothing: an unpackaged WinExe has no console and the window
             // that would have shown the error is the thing that failed to build.
             Program.Fatal("the shell could not start", ex);
+            if (Program.Smoke is { } failed) failed.Fail("boot", ex);
             Environment.Exit(1);
             return;
         }
