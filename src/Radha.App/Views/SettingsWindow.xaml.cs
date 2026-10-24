@@ -27,12 +27,15 @@ public sealed partial class SettingsWindow : Window
     private readonly Func<string, bool> _applyPower;
     private readonly int _hotkeys;
     private readonly IReadOnlyList<string> _hotkeyFailures;
+    private readonly Action _quit;
     private ShellConfig _config;
     private bool _loading;
 
     public SettingsWindow(ConfigStore store, IThemeService theme, Func<Task<string>> updateCheck,
-                          Func<string, bool> applyPower, int hotkeys, IReadOnlyList<string> hotkeyFailures)
+                          Func<string, bool> applyPower, int hotkeys, IReadOnlyList<string> hotkeyFailures,
+                          Action quit)
     {
+        _quit = quit;
         _store = store;
         _theme = theme;
         _updateCheck = updateCheck;
@@ -173,6 +176,8 @@ public sealed partial class SettingsWindow : Window
         LoadIntoControls();
         StatusText.Text = "reloaded from disk";
     }
+
+    private void OnQuitShell(object sender, RoutedEventArgs e) => _quit();
 
     private void OnSave(object sender, RoutedEventArgs e)
     {

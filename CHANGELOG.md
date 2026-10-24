@@ -4,6 +4,24 @@ All notable changes to RADHA SHELL are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning is
 [SemVer](https://semver.org/).
 
+## Unreleased — first run is a window, and the control centre is real
+
+- **Setup opens on the first launch.** Three pages — appearance, bar, behaviour — with a live
+  preview of the bar at the top, and a Quit button that exits before anything is drawn on the
+  desktop. Reopenable from the tray (`Set up RADHA SHELL…`) or with `--setup`; deleting
+  `%APPDATA%\Radha\shell.json` asks for it again.
+- **The control centre matches the shell it belongs to.** Three mixers with mute buttons and live
+  values, twelve toggles in a three-across grid, and the dynamic-theme card with the variant picker,
+  next-wallpaper and the wallpaper picker. Setting the wallpaper now opens the dashboard on its
+  Wallpaper tab instead of the launcher.
+- **The toggles do things.** Night light is a gamma ramp, energy saver is the Windows power overlay,
+  rotation lock is `SetDisplayAutoRotationPreferences`, brightness is Dxva2 (disabled with a reason
+  on panels that cannot obey), and the four tiles Windows has no API for open the page that owns the
+  behaviour instead of pretending.
+- **Stopping the shell is a first-class action.** Quit in the control centre, in the tray menu, in
+  the settings footer and in the session menu; all four run the same shutdown, which removes the
+  tray icon and closes the IPC pipe before the application exits.
+
 ## Unreleased — the exe actually opens now
 
 Three separate reasons a double-click produced no window, all found by making the release pipeline

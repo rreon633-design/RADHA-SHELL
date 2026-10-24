@@ -60,6 +60,7 @@ public sealed class ShellHost : IAsyncDisposable
     private DispatcherTimer? _idleTimer;
     private UpdateResult? _update;
     private SettingsWindow? _settings;
+    private FirstRunWindow? _setup;
     private string[] _wifiNetworks = Array.Empty<string>();
     private bool _idleInhibited;
 
@@ -137,8 +138,11 @@ public sealed class ShellHost : IAsyncDisposable
         _controlCenter = new ControlCenterViewModel(
             _state, _theme, _wallpaper,
             _services.GetRequiredService<INetworkService>(),
-            _bluetooth, _audio,
-            (module, command, args) => _ = ExecuteCommandAsync(module, command, args));
+            _bluetooth, _audio, _workspaces,
+            (module, command, args) => _ = ExecuteCommandAsync(module, command, args),
+            OpenSettings,
+            OpenWallpaperPicker,
+            Quit);
 
         _theme.Changed += (_, scheme) => _state.ApplyTheme(scheme);
 
@@ -150,6 +154,7 @@ public sealed class ShellHost : IAsyncDisposable
         Program.Smoke?.Stage("viewmodels");
         Bar = new BarWindow(_state, null, _config.Bar.Height, _config.Bar.ScrollActions);
         Overlay = new OverlayWindow(_state, _dashboard, _launcher, _controlCenter);
+        Overlay.QuitRequested += Quit;
         Overlay.ConfigureWallpaper(_wallpaper, _config);
         Osd = new OsdWindow(_state);
 
@@ -704,6 +709,7 @@ public sealed class ShellHost : IAsyncDisposable
             (4, "Notifications"),
             (5, null),
             (6, "Settings"),
+            (10, "Set up RADHA SHELL…"),
             (7, "Diagnostics bundle"),
             (8, null),
             (9, "Quit RADHA SHELL")
@@ -719,7 +725,8 @@ public sealed class ShellHost : IAsyncDisposable
                 case 4: _ = ExecuteCommandAsync("notifications", "toggle", Array.Empty<string>()); break;
                 case 6: OpenSettings(); break;
                 case 7: _ = ExecuteCommandAsync("config", "diagnostics", Array.Empty<string>()); break;
-                case 9: Application.Current.Exit(); break;
+                case 9: Quit(); break;
+                case 10: OpenSetup(); break;
             }
         };
 
@@ -798,6 +805,48 @@ public sealed class ShellHost : IAsyncDisposable
             Array.Empty<string>()));
     }
 
+    /// <summary>
+    /// Stops the shell from any surface that offers it: the control centre, the tray menu, the
+    /// session menu or <c>--quit</c>. Shutting down through the application lets WinUI tear down
+    /// its own windows; the tray icon and the IPC pipe are removed first so nothing is left behind
+    /// for the next launch to trip over.
+    /// </summary>
+    public void Quit()
+    {
+        try
+        {
+            _tray.Dispose();
+            _ipc.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(2));
+        }
+        catch
+        {
+            // Shutting down must not be able to fail visibly.
+        }
+
+        Application.Current.Exit();
+    }
+
+    /// <summary>Opens the dashboard on its Wallpaper tab, which is where the picker lives.</summary>
+    public void OpenWallpaperPicker()
+    {
+        _state.ShowModule("dashboard", "open", Array.Empty<string>());
+        Overlay.ShowWallpaperTab();
+    }
+
+    /// <summary>The setup window, reachable long after the first run.</summary>
+    public void OpenSetup()
+    {
+        if (_setup is not null)
+        {
+            _setup.Activate();
+            return;
+        }
+
+        _setup = new FirstRunWindow(_configStore, _theme);
+        _setup.Closed += (_, _) => _setup = null;
+        _setup.Activate();
+    }
+
     public void OpenSettings()
     {
         if (_settings is not null)
@@ -812,7 +861,8 @@ public sealed class ShellHost : IAsyncDisposable
             CheckUpdatesAsync,
             ApplyPowerProfile,
             _hotkeys?.Registered.Count ?? 0,
-            _hotkeys?.Failures ?? Array.Empty<string>());
+            _hotkeys?.Failures ?? Array.Empty<string>(),
+            Quit);
         _settings.Closed += (_, _) => _settings = null;
         _settings.Activate();
     }

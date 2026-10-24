@@ -17,6 +17,9 @@ public sealed partial class TileViewModel : ObservableObject
     [ObservableProperty] private string _label;
     [ObservableProperty] private string _glyph;
     [ObservableProperty] private string _detail = "";
+
+    /// <summary>False when this machine cannot do what the tile offers; the tile greys out.</summary>
+    [ObservableProperty] private bool _isAvailable = true;
     [ObservableProperty] private SolidColorBrush _tileBrush = new(Microsoft.UI.Colors.Transparent);
     [ObservableProperty] private SolidColorBrush _iconBackground = new(Microsoft.UI.Colors.Transparent);
     [ObservableProperty] private SolidColorBrush _labelBrush = new(Microsoft.UI.Colors.White);

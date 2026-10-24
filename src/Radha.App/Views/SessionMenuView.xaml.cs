@@ -1,8 +1,7 @@
 using System.Diagnostics;
 using Microsoft.UI.Xaml;
-using Radha.Core.Security;
-using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Radha.Core.Security;
 
 namespace Radha.App.Views;
 
@@ -29,6 +28,14 @@ public sealed partial class SessionMenuView : UserControl
         Run("rundll32.exe", "powrprof.dll,SetSuspendState 0,1,0");
 
     /// <summary>Hibernation fails on a machine with the feature off; the call simply returns.</summary>
+    /// <summary>
+    /// Stops RADHA SHELL and leaves Windows running. Raised as an event so this view stays a view:
+    /// the host owns shutdown order (tray icon, IPC pipe, then the application).
+    /// </summary>
+    public event Action? QuitRequested;
+
+    private void OnQuitShell(object sender, RoutedEventArgs e) => QuitRequested?.Invoke();
+
     private void OnHibernate(object sender, RoutedEventArgs e) => RunConfirmed("hibernate", "Hibernate", "shutdown.exe", "/h");
 
     private void OnReboot(object sender, RoutedEventArgs e) => RunConfirmed("reboot", "Restart", "shutdown.exe", "/r /t 0");

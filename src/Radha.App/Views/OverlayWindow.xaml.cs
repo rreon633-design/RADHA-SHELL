@@ -17,6 +17,9 @@ namespace Radha.App.Views;
 public sealed partial class OverlayWindow : Window
 {
     private readonly ShellState _state;
+
+    /// <summary>Raised when the user stops the shell from the session menu.</summary>
+    public event Action? QuitRequested;
     private AppWindow? _appWindow;
 
     public OverlayWindow(
@@ -40,9 +43,18 @@ public sealed partial class OverlayWindow : Window
         TryEnableAcrylic();
         ConfigureWindow();
 
+        SessionMenu.QuitRequested += () =>
+        {
+            _state.CloseAll();
+            QuitRequested?.Invoke();
+        };
+
         state.OverlayChanged += (_, _) => SyncVisibility();
         SyncVisibility();
     }
+
+    /// <summary>Brings the wallpaper tab forward — used by the control centre's picker button.</summary>
+    public void ShowWallpaperTab() => Dashboard.ShowWallpaperTab();
 
     /// <summary>Wires the wallpaper tab; called by the host after the overlay is constructed.</summary>
     public void ConfigureWallpaper(Radha.Core.Services.IWallpaperService wallpaper, Radha.Core.Config.ShellConfig config) =>

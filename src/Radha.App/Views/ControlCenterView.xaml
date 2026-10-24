@@ -4,90 +4,125 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <Border Background="{Binding State.Theme.SurfaceGlass}"
+    <Border Background="{Binding State.Theme.SurfaceGlassStrong}"
             BorderBrush="{Binding State.Theme.OutlineVariant}" BorderThickness="1"
-            CornerRadius="28" Padding="14">
+            CornerRadius="28" Padding="16,14,16,14" Width="360">
         <StackPanel Spacing="12">
 
-            <Grid>
-                <StackPanel>
-                    <TextBlock Text="Control centre" FontSize="14" FontWeight="SemiBold"
+            <!-- header -->
+            <Grid Margin="2,0,0,0">
+                <StackPanel Spacing="1">
+                    <TextBlock Text="Control centre" FontSize="15" FontWeight="SemiBold"
                                Foreground="{Binding State.Theme.OnSurface}" />
-                    <TextBlock Text="{Binding NetworkName}" FontSize="9"
+                    <TextBlock Text="{Binding NetworkName}" FontSize="10"
                                Foreground="{Binding State.Theme.OnSurfaceVariant}" />
                 </StackPanel>
-                <Button HorizontalAlignment="Right" Width="30" Height="30" Padding="0"
-                        CornerRadius="10" BorderThickness="0"
+                <Button HorizontalAlignment="Right" VerticalAlignment="Top" Width="30" Height="30"
+                        Padding="0" CornerRadius="10" BorderThickness="0"
                         Background="{Binding State.Theme.SurfaceContainerHigh}"
                         Command="{Binding State.CloseAllCommand}">
                     <FontIcon Glyph="&#xE711;" FontSize="11" Foreground="{Binding State.Theme.OnSurfaceVariant}" />
                 </Button>
             </Grid>
 
-            <!-- sliders -->
-            <Border Background="{Binding State.Theme.SurfaceContainerHigh}" CornerRadius="18" Padding="12">
-                <StackPanel Spacing="6">
-                    <Grid ColumnSpacing="10">
+            <!-- three mixers -->
+            <Border Background="{Binding State.Theme.SurfaceContainerHigh}" CornerRadius="20" Padding="14,10,14,10">
+                <StackPanel Spacing="2">
+
+                    <Grid ColumnSpacing="12">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="24" />
+                            <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="34" />
                         </Grid.ColumnDefinitions>
-                        <FontIcon Glyph="&#xE767;" FontSize="13" Foreground="{Binding State.Theme.OnSurfaceVariant}" />
-                        <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding Volume, Mode=TwoWay}"
+                        <Button Width="26" Height="26" Padding="0" CornerRadius="9" BorderThickness="0"
+                                Background="Transparent" Click="OnMuteVolume" ToolTipService.ToolTip="Mute">
+                            <FontIcon Glyph="&#xE767;" FontSize="13" Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                        </Button>
+                        <Slider Grid.Column="1" Minimum="0" Maximum="100" StepFrequency="1"
+                                Value="{Binding Volume, Mode=TwoWay}"
                                 Foreground="{Binding State.Theme.Primary}" />
+                        <TextBlock Grid.Column="2" Text="{Binding VolumeText}" FontSize="10" Margin="0,0,4,0"
+                                   HorizontalAlignment="Right" VerticalAlignment="Center"
+                                   Foreground="{Binding State.Theme.OnSurfaceVariant}" />
                     </Grid>
-                    <Grid ColumnSpacing="10">
+
+                    <Grid ColumnSpacing="12">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="24" />
+                            <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="34" />
                         </Grid.ColumnDefinitions>
-                        <FontIcon Glyph="&#xE706;" FontSize="13" Foreground="{Binding State.Theme.OnSurfaceVariant}" />
-                        <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding Brightness, Mode=TwoWay}"
+                        <Button Width="26" Height="26" Padding="0" CornerRadius="9" BorderThickness="0"
+                                Background="Transparent" Click="OnBrightnessUnsupported"
+                                ToolTipService.ToolTip="Brightness">
+                            <FontIcon Glyph="&#xE706;" FontSize="13" Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                        </Button>
+                        <Slider x:Name="BrightnessSlider" Grid.Column="1" Minimum="0" Maximum="100"
+                                StepFrequency="1" Value="{Binding Brightness, Mode=TwoWay}"
+                                IsEnabled="{Binding BrightnessAvailable}"
                                 Foreground="{Binding State.Theme.Primary}" />
+                        <TextBlock Grid.Column="2" Text="{Binding BrightnessText}" FontSize="10" Margin="0,0,4,0"
+                                   HorizontalAlignment="Right" VerticalAlignment="Center"
+                                   Foreground="{Binding State.Theme.OnSurfaceVariant}" />
                     </Grid>
-                    <Grid ColumnSpacing="10">
+
+                    <Grid ColumnSpacing="12">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="24" />
+                            <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="34" />
                         </Grid.ColumnDefinitions>
-                        <FontIcon Glyph="&#xE720;" FontSize="13" Foreground="{Binding State.Theme.OnSurfaceVariant}" />
-                        <Slider Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding Microphone, Mode=TwoWay}"
+                        <Button Width="26" Height="26" Padding="0" CornerRadius="9" BorderThickness="0"
+                                Background="Transparent" Click="OnMuteMic" ToolTipService.ToolTip="Mute microphone">
+                            <FontIcon Glyph="&#xE720;" FontSize="13" Foreground="{Binding State.Theme.OnSurfaceVariant}" />
+                        </Button>
+                        <Slider Grid.Column="1" Minimum="0" Maximum="100" StepFrequency="1"
+                                Value="{Binding Microphone, Mode=TwoWay}"
                                 Foreground="{Binding State.Theme.Primary}" />
+                        <TextBlock Grid.Column="2" Text="{Binding MicrophoneText}" FontSize="10" Margin="0,0,4,0"
+                                   HorizontalAlignment="Right" VerticalAlignment="Center"
+                                   Foreground="{Binding State.Theme.OnSurfaceVariant}" />
                     </Grid>
                 </StackPanel>
             </Border>
 
-            <!-- tiles -->
+            <!-- 12 toggles, three across -->
             <ItemsRepeater ItemsSource="{Binding Tiles}">
                 <ItemsRepeater.Layout>
-                    <UniformGridLayout MinItemWidth="104" MinItemHeight="70" ItemsStretch="Fill"
+                    <UniformGridLayout MinItemWidth="104" MinItemHeight="74" ItemsStretch="Fill"
                                        MinColumnSpacing="8" MinRowSpacing="8" />
                 </ItemsRepeater.Layout>
                 <ItemsRepeater.ItemTemplate>
                     <DataTemplate>
-                        <Button Click="OnTileClick" Padding="10" CornerRadius="16" BorderThickness="0"
-                                HorizontalContentAlignment="Stretch"
+                        <Button Click="OnTileClick" Padding="6,8,6,6" CornerRadius="18" BorderThickness="0"
+                                HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                                 Background="{Binding TileBrush}">
-                            <StackPanel Spacing="5">
-                                <Border Width="26" Height="26" CornerRadius="8" Background="{Binding IconBackground}">
-                                    <FontIcon Glyph="{Binding Glyph}" FontSize="13" Foreground="{Binding IconBrush}" />
+                            <StackPanel Spacing="6" HorizontalAlignment="Center">
+                                <Border Width="30" Height="30" CornerRadius="10" Background="{Binding IconBackground}"
+                                        HorizontalAlignment="Center">
+                                    <FontIcon Glyph="{Binding Glyph}" FontSize="14" Foreground="{Binding IconBrush}" />
                                 </Border>
-                                <TextBlock Text="{Binding Label}" FontSize="9.5" TextWrapping="Wrap"
+                                <TextBlock Text="{Binding Label}" FontSize="9.5" TextAlignment="Center"
+                                           TextWrapping="Wrap" HorizontalAlignment="Center"
                                            Foreground="{Binding LabelBrush}" />
+                                <TextBlock Text="{Binding Detail}" FontSize="8" TextAlignment="Center"
+                                           HorizontalAlignment="Center" Margin="0,-3,0,0"
+                                           Foreground="{Binding LabelBrush}" Opacity="0.62" />
                             </StackPanel>
                         </Button>
                     </DataTemplate>
                 </ItemsRepeater.ItemTemplate>
             </ItemsRepeater>
 
-            <!-- theme card -->
-            <Border Background="{Binding State.Theme.SurfaceContainerHigh}" CornerRadius="18" Padding="12">
-                <StackPanel Spacing="8">
+            <!-- dynamic theme -->
+            <Border Background="{Binding State.Theme.SurfaceContainerHigh}" CornerRadius="20" Padding="14,12,14,12">
+                <StackPanel Spacing="10">
                     <Grid>
-                        <TextBlock Text="Dynamic theme" FontSize="10.5" FontWeight="SemiBold"
+                        <TextBlock Text="Dynamic theme" FontSize="11" FontWeight="SemiBold"
                                    Foreground="{Binding State.Theme.OnSurface}" />
-                        <TextBlock Text="Material 3" FontSize="8.5" HorizontalAlignment="Right"
-                                   Foreground="{Binding State.Theme.Primary}" />
+                        <TextBlock Text="{Binding VariantLabel}" FontSize="8.5" HorizontalAlignment="Right"
+                                   VerticalAlignment="Center" Foreground="{Binding State.Theme.Primary}" />
                     </Grid>
 
                     <Grid ColumnSpacing="8">
@@ -96,9 +131,9 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <ComboBox ItemsSource="{Binding Variants}" SelectedItem="{Binding SelectedVariant, Mode=TwoWay}"
-                                  HorizontalAlignment="Stretch" />
-                        <Button Grid.Column="1" Command="{Binding ToggleDarkCommand}" Width="34" Height="32"
-                                Padding="0" CornerRadius="10" BorderThickness="0"
+                                  HorizontalAlignment="Stretch" FontSize="11" CornerRadius="12" />
+                        <Button Grid.Column="1" Command="{Binding ToggleDarkCommand}" Width="36" Height="34"
+                                Padding="0" CornerRadius="12" BorderThickness="0"
                                 Background="{Binding State.Theme.PrimaryContainer}">
                             <FontIcon Glyph="&#xE793;" FontSize="13"
                                       Foreground="{Binding State.Theme.OnPrimaryContainer}" />
@@ -110,20 +145,49 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <Button Content="Next wallpaper" FontSize="10" HorizontalAlignment="Stretch"
-                                HorizontalContentAlignment="Center" CornerRadius="10" BorderThickness="0"
+                        <Button Content="Next wallpaper" FontSize="10.5" HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Center" Height="32" CornerRadius="12" BorderThickness="0"
                                 Background="{Binding State.Theme.SurfaceContainerHighest}"
                                 Foreground="{Binding State.Theme.OnSurface}"
-                                Command="{Binding RefreshWallpaperCommand}" />
-                        <Button Grid.Column="1" Content="Wallpaper picker" FontSize="10"
-                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                                CornerRadius="10" BorderThickness="0"
+                                Command="{Binding NextWallpaperCommand}" />
+                        <Button Grid.Column="1" Content="Wallpaper picker" FontSize="10.5"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Height="32"
+                                CornerRadius="12" BorderThickness="0"
                                 Background="{Binding State.Theme.SurfaceContainerHighest}"
                                 Foreground="{Binding State.Theme.OnSurface}"
-                                Command="{Binding State.ToggleLauncherCommand}" />
+                                Command="{Binding OpenWallpaperPickerCommand}" />
                     </Grid>
                 </StackPanel>
             </Border>
+
+            <!-- footer: settings, workspaces hint, quit -->
+            <Grid ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Height="34"
+                        CornerRadius="12" BorderThickness="0" FontSize="11"
+                        Background="{Binding State.Theme.SurfaceContainerHigh}"
+                        Foreground="{Binding State.Theme.OnSurface}"
+                        Command="{Binding OpenSettingsCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="7">
+                        <FontIcon Glyph="&#xE713;" FontSize="12" />
+                        <TextBlock Text="Settings" FontSize="11" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="1" Width="86" Height="34" CornerRadius="12" BorderThickness="0"
+                        FontSize="11" HorizontalContentAlignment="Center"
+                        Background="{Binding State.Theme.SurfaceContainerHigh}"
+                        Foreground="{Binding State.Theme.Error}"
+                        Command="{Binding QuitCommand}"
+                        ToolTipService.ToolTip="Stop RADHA SHELL">
+                    <StackPanel Orientation="Horizontal" Spacing="7">
+                        <FontIcon Glyph="&#xE7E8;" FontSize="12" />
+                        <TextBlock Text="Quit" FontSize="11" />
+                    </StackPanel>
+                </Button>
+            </Grid>
         </StackPanel>
     </Border>
 </UserControl>

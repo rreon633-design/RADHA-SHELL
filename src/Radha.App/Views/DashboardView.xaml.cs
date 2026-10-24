@@ -8,6 +8,12 @@ public sealed partial class DashboardView : UserControl
 {
     public DashboardView() => InitializeComponent();
 
+    /// <summary>Selects the Wallpaper tab without going through the pivot's own headers.</summary>
+    public void ShowWallpaperTab()
+    {
+        if (WallpaperPicker.Parent is PivotItem item) Tabs.SelectedItem = item;
+    }
+
     /// <summary>The wallpaper tab, configured by the host once services exist.</summary>
     public WallpaperPickerView Picker => WallpaperPicker;
 

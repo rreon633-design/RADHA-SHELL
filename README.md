@@ -208,6 +208,18 @@ maintenance, problematic areas, risks, advantages, future scope, success metrics
 
 Policies: [SECURITY.md](SECURITY.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [CHANGELOG.md](CHANGELOG.md) · [LICENSE](LICENSE)
 
+## First run
+
+The first launch opens a setup window — appearance, bar, behaviour — with a live preview of the bar
+and a Quit button, so a machine that is not ready for a shell never gets one installed on the
+desktop by accident. Everything in it is editable later from the tray, the control centre or
+Settings. `--setup` reopens it; deleting `%APPDATA%\Radha\shell.json` brings it back.
+
+The control centre is the everyday surface: three mixers, twelve toggles and the dynamic-theme card.
+Toggles that this machine cannot honour say so instead of flipping a decoration — brightness on a
+panel without DDC/CI, for instance. Stopping the shell is available there, in the tray menu, in
+Settings and in the session menu; all four run the same shutdown.
+
 ## Control surface
 
 There is no separate CLI binary. The shell is driven by:

@@ -195,10 +195,13 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <TextBlock x:Name="StatusText" FontSize="12" VerticalAlignment="Center" Opacity="0.8" />
-            <Button Grid.Column="1" Content="Reload" Click="OnReload" />
-            <Button Grid.Column="2" Content="Save" Style="{ThemeResource AccentButtonStyle}" Click="OnSave" />
+            <Button Grid.Column="1" Content="Stop RADHA SHELL" Click="OnQuitShell"
+                    ToolTipService.ToolTip="Ends this shell; Windows keeps running" />
+            <Button Grid.Column="2" Content="Reload" Click="OnReload" />
+            <Button Grid.Column="3" Content="Save" Style="{ThemeResource AccentButtonStyle}" Click="OnSave" />
         </Grid>
     </Grid>
 </Window>

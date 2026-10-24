@@ -61,12 +61,52 @@ public partial class App : Application
         }
     }
 
+    /// <summary>
+    /// True when the config file does not exist yet, or when <c>--setup</c> was passed. The file is
+    /// the signal rather than a settings flag: deleting it is how a user asks for a clean setup.
+    /// </summary>
+    private static bool SetupRequested()
+    {
+        if (Environment.GetCommandLineArgs()
+            .Any(a => string.Equals(a, "--setup", StringComparison.OrdinalIgnoreCase)))
+            return true;
+
+        try
+        {
+            return !File.Exists(Radha.Core.Config.ConfigStore.DefaultConfigPath());
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
         try
         {
             Program.Smoke?.Stage("ui");
             Ui.Initialize();
+
+            // First run, or an explicit --setup: ask before anything is drawn on the desktop. The
+            // bar is not started behind the window, so quitting here leaves no processes, no tray
+            // icon and no half-written config behind.
+            if (Program.Smoke is null && SetupRequested())
+            {
+                Program.Smoke?.Stage("setup");
+                var store = new Radha.Core.Config.ConfigStore();
+                var theme = new Radha.App.Services.Win.ThemeService();
+                theme.Initialize(store.Load());
+
+                var wizard = new Views.FirstRunWindow(store, theme);
+                wizard.Activate();
+                if (!await wizard.Completion)
+                {
+                    Application.Current.Exit();
+                    return;
+                }
+            }
+
             Program.Smoke?.Stage("host");
             _host = new ShellHost();
             Program.Smoke?.Stage("start");
